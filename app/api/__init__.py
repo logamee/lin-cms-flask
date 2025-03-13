@@ -1,12 +1,13 @@
 """
-    :copyright: © 2021 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2021 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from typing import Dict
 
-from app.lin import SpecTree
 from spectree import SecurityScheme
+
+from app.lin import SpecTree
 
 api = SpecTree(
     backend_name="flask",

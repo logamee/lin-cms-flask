@@ -1,12 +1,13 @@
 """
-    loader of Lin
-    ~~~~~~~~~
+loader of Lin
+~~~~~~~~~
 
-    This module implements a plugin loader of Lin.
+This module implements a plugin loader of Lin.
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from importlib import import_module
 
 from .config import lin_config
@@ -58,9 +59,7 @@ class Loader(object):
     def _check_version(self, path, version, name):
         info_mod = import_module(path)
         info_dic = info_mod.__dict__
-        assert info_dic["__version__"] == version, (
-            "the plugin " + name + " needs to be updated"
-        )
+        assert info_dic["__version__"] == version, "the plugin " + name + " needs to be updated"
 
     def _load_config(self, config_path, name, conf):
         default_conf = {}

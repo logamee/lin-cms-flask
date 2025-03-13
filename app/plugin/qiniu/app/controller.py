@@ -1,11 +1,12 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from flask import request
-from app.lin import FileExtensionError, Redprint, lin_config
 from qiniu import Auth
+
+from app.lin import FileExtensionError, Redprint, lin_config
 
 from .model import Qiniu
 

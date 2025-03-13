@@ -1,7 +1,8 @@
 from typing import List, Optional
 
-from app.lin import BaseModel, ParameterError
 from pydantic import EmailStr, Field, validator
+
+from app.lin import BaseModel, ParameterError
 
 
 class EmailSchema(BaseModel):

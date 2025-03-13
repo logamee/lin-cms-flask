@@ -1,5 +1,5 @@
 # use production environment settings
-echo "FLASK_ENV=production" >> .flaskenv
+echo "FLASK_ENV=production">>.flaskenv
 # initialize database
 flask db init
 # gunicorn server

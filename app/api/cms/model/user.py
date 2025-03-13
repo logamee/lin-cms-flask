@@ -1,6 +1,7 @@
+from sqlalchemy import func
+
 from app.lin import User as LinUser
 from app.lin import db, manager
-from sqlalchemy import func
 
 
 class User(LinUser):

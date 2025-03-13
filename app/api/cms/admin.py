@@ -1,25 +1,13 @@
 """
-    admin apis
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+admin apis
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import math
 
 from flask import Blueprint, g
-from app.lin import (
-    DocResponse,
-    Forbidden,
-    GroupLevelEnum,
-    Logger,
-    NotFound,
-    ParameterError,
-    Success,
-    admin_required,
-    db,
-    manager,
-    permission_meta,
-)
 from sqlalchemy import func
 
 from app.api import AuthorizationBearerSecurity, api
@@ -34,6 +22,19 @@ from app.api.cms.schema.admin import (
     GroupIdWithPermissionIdListSchema,
     QueryPageWithGroupIdSchema,
     UpdateUserInfoSchema,
+)
+from app.lin import (
+    DocResponse,
+    Forbidden,
+    GroupLevelEnum,
+    Logger,
+    NotFound,
+    ParameterError,
+    Success,
+    admin_required,
+    db,
+    manager,
+    permission_meta,
 )
 
 admin_api = Blueprint("admin", __name__)
@@ -146,7 +147,7 @@ def change_user_password(uid: int, json: ResetPasswordSchema):
     with db.auto_commit():
         user.reset_password(g.new_password)
 
-    return Success("密码修改成功")
+    raise Success("密码修改成功")
 
 
 @admin_api.route("/user/<int:uid>", methods=["DELETE"])
@@ -172,7 +173,7 @@ def delete_user(uid):
     with db.auto_commit():
         manager.user_group_model.query.filter_by(user_id=uid).delete(synchronize_session=False)
         user.hard_delete()
-    return Success("操作成功")
+    raise Success("操作成功")
 
 
 @admin_api.route("/user/<int:uid>", methods=["PUT"])
@@ -214,7 +215,7 @@ def update_user(uid: int, json: UpdateUserInfoSchema):
             user_group.group_id = group_id
             user_group_list.append(user_group)
         db.session.add_all(user_group_list)
-    return Success("操作成功")
+    raise Success("操作成功")
 
 
 @admin_api.route("/group/all")
@@ -291,7 +292,7 @@ def create_group(json: CreateGroupSchema):
             gp.permission_id = permission_id
             group_permission_list.append(gp)
         db.session.add_all(group_permission_list)
-    return Success("新建分组成功")
+    raise Success("新建分组成功")
 
 
 @admin_api.route("/group/<int:gid>", methods=["PUT"])
@@ -313,7 +314,7 @@ def update_group(gid, json: GroupBaseSchema):
     if not exists:
         raise NotFound("分组不存在，更新失败")
     exists.update(name=g.name, info=g.info, commit=True)
-    return Success("更新成功")
+    raise Success("更新成功")
 
 
 @admin_api.route("/group/<int:gid>", methods=["DELETE"])
@@ -343,7 +344,7 @@ def delete_group(gid):
         manager.group_permission_model.query.filter_by(group_id=gid).delete(synchronize_session=False)
         # 删除group
         exist.delete()
-    return Success("删除分组成功")
+    raise Success("删除分组成功")
 
 
 @admin_api.route("/permission/dispatch/batch", methods=["POST"])
@@ -368,7 +369,7 @@ def dispatch_auths(json: GroupIdWithPermissionIdListSchema):
                     group_id=g.group_id,
                     permission_id=permission_id,
                 )
-    return Success("添加权限成功")
+    raise Success("添加权限成功")
 
 
 @admin_api.route("/permission/remove", methods=["POST"])
@@ -390,4 +391,4 @@ def remove_auths(json: GroupIdWithPermissionIdListSchema):
             manager.group_permission_model.group_id == g.group_id,
         ).delete(synchronize_session=False)
 
-    return Success("删除权限成功")
+    raise Success("删除权限成功")

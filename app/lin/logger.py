@@ -1,12 +1,13 @@
 """
-    Logger of Lin
-    ~~~~~~~~~
+Logger of Lin
+~~~~~~~~~
 
-    logger模块，用户行为日志记录器
+logger模块，用户行为日志记录器
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import re
 from functools import wraps
 
@@ -59,18 +60,10 @@ class Log(InfoCrud):
             query = query.filter(cls.create_time < conditions.get("end"))
             del conditions["end"]
         if conditions.get("keyword"):
-            query = query.filter(
-                cls.message.like(
-                    "%{keyword}%".format(keyword=conditions.get("keyword"))
-                )
-            )
+            query = query.filter(cls.message.like("%{keyword}%".format(keyword=conditions.get("keyword"))))
             del conditions["keyword"]
         # 搜索表内字段
-        query = (
-            query.filter_by(**conditions)
-            .group_by(cls.create_time)
-            .order_by(cls.create_time.desc())
-        )
+        query = query.filter_by(**conditions).group_by(cls.create_time).order_by(cls.create_time.desc())
         logs = query.all()
         return logs
 

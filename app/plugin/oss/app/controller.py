@@ -2,6 +2,7 @@ import os
 
 import oss2
 from flask import jsonify, request
+
 from app.lin import Failed, ParameterError, Redprint, Success, db, get_random_str, lin_config
 
 from .model import OSS
@@ -19,7 +20,7 @@ def upload():
         image.save(path)
     else:
         raise ParameterError("图片类型不允许或图片key不合法")
-    return Success()
+    raise Success()
 
 
 @api.route("/upload_to_ali", methods=["POST"])

@@ -1,9 +1,10 @@
 """
-    db of Lin
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+db of Lin
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import os
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -11,16 +12,31 @@ from inspect import isclass
 
 import tablib
 from flask import json
-from flask_sqlalchemy import BaseQuery
-from flask_sqlalchemy import Model as _Model
+
+# from flask_sqlalchemy import Model as _Model
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import exc, func, inspect, orm, text
+
+# from flask_sqlalchemy import BaseQuery
+from sqlalchemy.orm import Query as BaseQuery
+from sqlalchemy.orm import declarative_base, declared_attr, has_inherited_table
 from sqlalchemy.pool import QueuePool
 
 from .exception import NotFound
+from .utils import camel2line
+
+Base = declarative_base()
 
 
 class MixinJSONSerializer:
+
+    @declared_attr.directive
+    def __tablename__(cls):
+        name = None
+        if not has_inherited_table(cls):
+            name = camel2line(cls.__name__)
+        return name
+
     @orm.reconstructor
     def init_on_load(self):
         self._fields = []
@@ -52,6 +68,17 @@ class MixinJSONSerializer:
         return getattr(self, key)
 
 
+def isexception(obj):
+    """Given an object, return a boolean indicating whether it is an instance
+    or subclass of :py:class:`Exception`.
+    """
+    if isinstance(obj, Exception):
+        return True
+    if isclass(obj) and issubclass(obj, Exception):
+        return True
+    return False
+
+
 class Record(object):
     """A row, from a query, from a database."""
 
@@ -81,9 +108,12 @@ class Record(object):
             return self.values()[key]
 
         # Support for string-based lookup.
-        if key in self.keys():
-            i = self.keys().index(key)
-            if self.keys().count(key) > 1:
+        usekeys = self.keys()
+        if hasattr(usekeys, "_keys"):  # sqlalchemy 2.x uses (result.RMKeyView which has wrapped _keys as list)
+            usekeys = usekeys._keys
+        if key in usekeys:
+            i = usekeys.index(key)
+            if usekeys.count(key) > 1:
                 raise KeyError("Record contains multiple '{}' fields.".format(key))
             return self.values()[i]
 
@@ -177,7 +207,7 @@ class RecordCollection(object):
         if is_int:
             key = slice(key, key + 1)
 
-        while len(self) < key.stop or key.stop is None:
+        while key.stop is None or len(self) < key.stop:
             try:
                 next(self)
             except StopIteration:
@@ -264,9 +294,7 @@ class RecordCollection(object):
         try:
             self[1]
         except IndexError:
-            return self.first(
-                default=default, as_dict=as_dict, as_ordereddict=as_ordereddict
-            )
+            return self.first(default=default, as_dict=as_dict, as_ordereddict=as_ordereddict)
         else:
             raise ValueError(
                 "RecordCollection contained more than one row. "
@@ -280,14 +308,21 @@ class RecordCollection(object):
         return row[0] if row else default
 
 
-class Connection(object):
-    """A Database connection."""
+class Database(SQLAlchemy):
+    def __init__(self, **kwargs):
+        self.open = True
+        super(Database, self).__init__(**kwargs)
 
-    def __init__(self, connection):
-        self._conn = connection
+    def get_engine(self):
+        # Return the engine if open
+        if not self.open:
+            raise exc.ResourceClosedError("Database closed.")
+        return self.engine
 
     def close(self):
-        self._conn.close()
+        """Closes the Database."""
+        self.engine.dispose()
+        self.open = False
 
     def __enter__(self):
         return self
@@ -296,7 +331,96 @@ class Connection(object):
         self.close()
 
     def __repr__(self):
-        return "<Connection open={}>".format(not self._conn.closed)
+        return "<Database open={}>".format(self.open)
+
+    def get_table_names(self, internal=False, **kwargs):
+        """Returns a list of table names for the connected database."""
+
+        # Setup SQLAlchemy for Database inspection.
+        return inspect(self.engine).get_table_names(**kwargs)
+
+    def get_connection(self, close_with_result=False):
+        """Get a connection to this Database. Connections are retrieved from a
+        pool.
+        """
+        if not self.open:
+            raise exc.ResourceClosedError("Database closed.")
+
+        return Connection(self.engine.connect(), close_with_result=close_with_result)
+
+    def query(self, query, fetchall=False, **params):
+        """Executes the given SQL query against the Database. Parameters can,
+        optionally, be provided. Returns a RecordCollection, which can be
+        iterated over to get result rows as dictionaries.
+        """
+        with self.get_connection(True) as conn:
+            return conn.query(query, fetchall, **params)
+
+    def bulk_query(self, query, *multiparams):
+        """Bulk insert or update."""
+
+        with self.get_connection() as conn:
+            conn.bulk_query(query, *multiparams)
+
+    def query_file(self, path, fetchall=False, **params):
+        """Like Database.query, but takes a filename to load a query from."""
+
+        with self.get_connection(True) as conn:
+            return conn.query_file(path, fetchall, **params)
+
+    def bulk_query_file(self, path, *multiparams):
+        """Like Database.bulk_query, but takes a filename to load a query from."""
+
+        with self.get_connection() as conn:
+            conn.bulk_query_file(path, *multiparams)
+
+    @contextmanager
+    def transaction(self):
+        """A context manager for executing a transaction on this Database."""
+
+        conn = self.get_connection()
+        tx = conn.transaction()
+        try:
+            yield conn
+            tx.commit()
+        except:
+            tx.rollback()
+        finally:
+            conn.close()
+
+    @contextmanager
+    def auto_commit(self):
+        try:
+            yield
+            self.session.commit()
+        except Exception as e:
+            self.session.rollback()
+            raise e
+
+
+class Connection(object):
+    """A Database connection."""
+
+    def __init__(self, connection, close_with_result=False):
+        self._conn = connection
+        self.open = not connection.closed
+        self._close_with_result = close_with_result
+
+    def close(self):
+        # No need to close if this connection is used for a single result.
+        # The connection will close when the results are all consumed or GCed.
+        if not self._close_with_result:
+            self._conn.close()
+        self.open = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc, val, traceback):
+        self.close()
+
+    def __repr__(self):
+        return "<Connection open={}>".format(self.open)
 
     def query(self, query, fetchall=False, **params):
         """Executes the given SQL query against the connected Database.
@@ -305,10 +429,13 @@ class Connection(object):
         """
 
         # Execute the given query.
-        cursor = self._conn.execute(text(query), **params)  # TODO: PARAMS GO HERE
+        cursor = self._conn.execute(text(query).bindparams(**params))  # TODO: PARAMS GO HERE
 
         # Row-by-row Record generator.
-        row_gen = (Record(cursor.keys(), row) for row in cursor)
+        row_gen = iter(Record([], []))
+
+        if cursor.returns_rows:
+            row_gen = (Record(cursor.keys(), row) for row in cursor)
 
         # Convert psycopg2 results to RecordCollection.
         results = RecordCollection(row_gen)
@@ -368,118 +495,15 @@ class Connection(object):
         return self._conn.begin()
 
 
-class RecordsException(Exception):
-    """A records-specific exception."""
+def _reduce_datetimes(row):
+    """Receives a row, converts datetimes to strings."""
 
-    pass
+    row = list(row)
 
-
-class Database(SQLAlchemy):
-    def __init__(self, **kwargs):
-        self.open = True
-        super(Database, self).__init__(**kwargs)
-
-    @property
-    def dialect(self):
-        return self.engine.dialect.name
-
-    @property
-    def checkedout(self):
-        pool = self.engine.pool
-        if isinstance(pool, QueuePool):
-            return pool.checkedout()
-        return 0
-
-    def close(self, force=False):
-        """Closes the Database.
-        By default, the database must have no checked-out connections for this
-        operation to complete. This may be overriden by setting force=True, but
-        may result in stray connections.
-        """
-        if not force:
-            pool = self.engine.pool
-            if isinstance(pool, QueuePool) and pool.checkedout() != 0:
-                err_msg = (
-                    "Database has {} checked out connections. Consume "
-                    "all RecordCollections created by this database "
-                    "and try again.".format(pool.checkedout())
-                )
-                raise RecordsException(err_msg)
-
-        self.engine.dispose()
-        self.open = False
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc, val, traceback):
-        self.close()
-
-    def get_table_names(self, internal=False):
-        """Returns a list of table names for the connected database."""
-
-        # Setup SQLAlchemy for Database inspection.
-        return inspect(self.engine).get_table_names()
-
-    def get_connection(self):
-        """Get a connection to this Database. Connections are retrieved from a
-        pool. The retrieved connection remains open until its result is
-        consumed.
-        """
-        if not self.open:
-            raise exc.ResourceClosedError("Database closed.")
-
-        return Connection(self.engine.connect())
-
-    def query(self, query, fetchall=False, **params):
-        """Executes the given SQL query against the Database. Parameters can,
-        optionally, be provided. Returns a RecordCollection, which can be
-        iterated over to get result rows as dictionaries.
-        """
-        conn = self.get_connection()
-        return conn.query(query, fetchall, **params)
-
-    def bulk_query(self, query, *multiparams):
-        """Bulk insert or update."""
-
-        conn = self.get_connection()
-        conn.bulk_query(query, *multiparams)
-
-    def query_file(self, path, fetchall=False, **params):
-        """Like Database.query, but takes a filename to load a query from."""
-
-        conn = self.get_connection()
-        return conn.query_file(path, fetchall, **params)
-
-    def bulk_query_file(self, path, *multiparams):
-        """Like Database.bulk_query, but takes a filename to load a query from."""
-
-        conn = self.get_connection()
-        conn.bulk_query_file(path, *multiparams)
-
-    @contextmanager
-    def transaction(self):
-        """A context manager for executing a transaction on this Database."""
-
-        conn = self.get_connection()
-        tx = conn.transaction()
-        try:
-            yield conn
-            tx.commit()
-        except Exception as e:
-            tx.rollback()
-            raise e
-        finally:
-            conn.close()
-
-    @contextmanager
-    def auto_commit(self):
-        try:
-            yield
-            self.session.commit()
-        except Exception as e:
-            self.session.rollback()
-            raise e
+    for i, element in enumerate(row):
+        if hasattr(element, "isoformat"):
+            row[i] = element.isoformat()
+    return tuple(row)
 
 
 class Query(BaseQuery):
@@ -502,11 +526,11 @@ class Query(BaseQuery):
         return rv
 
 
-class Model(_Model):
+class Model(Base):
+    __abstract__ = True
+
     def __repr__(self):
-        detail = json.dumps(
-            {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
-        )
+        detail = json.dumps({k: v for k, v in self.__dict__.items() if not k.startswith("_")})
         identity = inspect(self).identity
         if identity is None:
             pk = "\n(transient {0} {1})\n".format(id(self), detail)
@@ -515,35 +539,9 @@ class Model(_Model):
         return "\n<{0} {1} {2}>\n".format(type(self).__name__, pk, detail)
 
 
-def isexception(obj):
-    """Given an object, return a boolean indicating whether it is an instance
-    or subclass of :py:class:`Exception`.
-    """
-    if isinstance(obj, Exception):
-        return True
-    if isclass(obj) and issubclass(obj, Exception):
-        return True
-    return False
-
-
-def _reduce_datetimes(row):
-    """Receives a row, converts datetimes to strings."""
-
-    row = list(row)
-
-    for i in range(len(row)):
-        if hasattr(row[i], "isoformat"):
-            row[i] = row[i].isoformat()
-    return tuple(row)
-
-
 def get_total_nums(cls, is_soft=False, **kwargs):
     nums = db.session.query(func.count(cls.id))
-    nums = (
-        nums.filter(cls.is_deleted == False).filter_by(**kwargs).scalar()
-        if is_soft
-        else nums.filter().scalar()
-    )
+    nums = nums.filter(cls.is_deleted == False).filter_by(**kwargs).scalar() if is_soft else nums.filter().scalar()
     if nums:
         return nums
     else:

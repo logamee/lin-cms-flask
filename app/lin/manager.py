@@ -1,13 +1,12 @@
 """
-     mananger module of Lin.
-     ~~~~~~~~~
+ mananger module of Lin.
+ ~~~~~~~~~
 
-     manager model
+ manager model
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
-
 
 from flask import current_app
 from werkzeug.local import LocalProxy
@@ -174,28 +173,24 @@ class Manager(object):
                     permission.module = module
                     permission.mount = mount
                     new_added_permissions.add(permission)
-            _sync_permissions(
-                self, new_added_permissions, unmounted_ids, mounted_ids, deleted_ids
-            )
+            _sync_permissions(self, new_added_permissions, unmounted_ids, mounted_ids, deleted_ids)
 
 
-def _sync_permissions(
-    manager, new_added_permissions, unmounted_ids, mounted_ids, deleted_ids
-):
+def _sync_permissions(manager, new_added_permissions, unmounted_ids, mounted_ids, deleted_ids):
     if new_added_permissions:
         db.session.add_all(new_added_permissions)
     if unmounted_ids:
-        manager.permission_model.query.filter(
-            manager.permission_model.id.in_(unmounted_ids)
-        ).update({"mount": False}, synchronize_session=False)
+        manager.permission_model.query.filter(manager.permission_model.id.in_(unmounted_ids)).update(
+            {"mount": False}, synchronize_session=False
+        )
     if mounted_ids:
-        manager.permission_model.query.filter(
-            manager.permission_model.id.in_(mounted_ids)
-        ).update({"mount": True}, synchronize_session=False)
+        manager.permission_model.query.filter(manager.permission_model.id.in_(mounted_ids)).update(
+            {"mount": True}, synchronize_session=False
+        )
     if deleted_ids:
-        manager.permission_model.query.filter(
-            manager.permission_model.id.in_(deleted_ids)
-        ).delete(synchronize_session=False)
+        manager.permission_model.query.filter(manager.permission_model.id.in_(deleted_ids)).delete(
+            synchronize_session=False
+        )
         # 分组-权限关联表中的数据也要清理
         manager.group_permission_model.query.filter(
             manager.group_permission_model.permission_id.in_(deleted_ids)

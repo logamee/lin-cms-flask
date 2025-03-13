@@ -1,7 +1,8 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import os
 import re
 import subprocess
@@ -95,7 +96,9 @@ class PluginInit:
                 plugin_module = import_module(self.path_info[name]["plugin_path"] + ".app.__init__")
                 dir_info = dir(plugin_module)
             except ModuleNotFoundError as e:
-                raise Exception(str(e) + "\n未找到插件" + name + "，请检查您输入的插件名是否正确或插件中是否有未安装的依赖包")
+                raise Exception(
+                    str(e) + "\n未找到插件" + name + "，请检查您输入的插件名是否正确或插件中是否有未安装的依赖包"
+                )
             if "initial_data" in dir_info:
                 plugin_module.initial_data()
         print("插件初始化成功")

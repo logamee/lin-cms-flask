@@ -1,8 +1,7 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
-
 
 from . import app, fixtureFunc, get_token  # type: ignore
 

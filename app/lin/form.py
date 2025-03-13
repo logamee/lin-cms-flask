@@ -1,11 +1,11 @@
 """
-    forms of Lin
-    ~~~~~~~~~
+forms of Lin
+~~~~~~~~~
 
-    forms check the incoming params and data
+forms check the incoming params and data
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from flask import request

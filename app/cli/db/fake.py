@@ -1,11 +1,10 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
-from app.lin import db
-
 from app.api.v1.model.book import Book
+from app.lin import db
 
 
 def fake():

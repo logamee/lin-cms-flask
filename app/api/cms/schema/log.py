@@ -2,9 +2,9 @@ import re
 from datetime import datetime
 from typing import List, Optional
 
-from app.lin import BaseModel
 from pydantic import Field, validator
 
+from app.lin import BaseModel
 from app.schema import BasePageSchema, QueryPageSchema, datetime_regex
 
 

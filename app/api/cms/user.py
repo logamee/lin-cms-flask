@@ -1,9 +1,10 @@
 """
-    user apis
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+user apis
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import jwt
 from flask import Blueprint, current_app, g, request
 from flask_jwt_extended import (
@@ -12,6 +13,18 @@ from flask_jwt_extended import (
     get_current_user,
     get_jwt_identity,
     verify_jwt_in_request,
+)
+
+from app.api import AuthorizationBearerSecurity, api
+from app.api.cms.exception import RefreshFailed
+from app.api.cms.schema.user import (
+    CaptchaSchema,
+    ChangePasswordSchema,
+    LoginSchema,
+    LoginTokenSchema,
+    UserBaseInfoSchema,
+    UserRegisterSchema,
+    UserSchema,
 )
 from app.lin import (
     DocResponse,
@@ -28,18 +41,6 @@ from app.lin import (
     login_required,
     manager,
     permission_meta,
-)
-
-from app.api import AuthorizationBearerSecurity, api
-from app.api.cms.exception import RefreshFailed
-from app.api.cms.schema.user import (
-    CaptchaSchema,
-    ChangePasswordSchema,
-    LoginSchema,
-    LoginTokenSchema,
-    UserBaseInfoSchema,
-    UserRegisterSchema,
-    UserSchema,
 )
 from app.util.captcha import CaptchaTool
 from app.util.common import split_group
@@ -86,7 +87,7 @@ def register(json: UserRegisterSchema):
             user_group.group_id = group_id
             db.session.add(user_group)
 
-    return Success("用户创建成功")  # type: ignore
+    raise Success("用户创建成功")  # type: ignore
 
 
 @user_api.route("/login", methods=["POST"])
@@ -143,7 +144,7 @@ def update(json: UserBaseInfoSchema):
             user.nickname = g.nickname
         if g.avatar:
             user._avatar = g.avatar
-    return Success("用户信息更新成功")
+    raise Success("用户信息更新成功")
 
 
 @user_api.route("/change_password", methods=["PUT"])
@@ -163,7 +164,7 @@ def change_password(json: ChangePasswordSchema):
     ok = user.change_password(g.old_password, g.new_password)
     if ok:
         db.session.commit()
-        return Success("密码修改成功")
+        raise Success("密码修改成功")
     else:
         return Failed("修改密码失败")
 

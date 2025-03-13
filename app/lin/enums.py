@@ -1,9 +1,10 @@
 """
-    enums of Lin
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+enums of Lin
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from enum import Enum
 
 

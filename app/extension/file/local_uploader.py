@@ -1,8 +1,9 @@
 import os
 
 from flask import current_app
-from app.lin import Uploader
 from werkzeug.utils import secure_filename
+
+from app.lin import Uploader
 
 from .file import File
 

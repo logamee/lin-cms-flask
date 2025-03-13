@@ -1,8 +1,8 @@
 from typing import List, Optional
 
-from app.lin import BaseModel, ParameterError
 from pydantic import Field, validator
 
+from app.lin import BaseModel, ParameterError
 from app.schema import BasePageSchema, QueryPageSchema
 
 from . import EmailSchema, GroupIdListSchema

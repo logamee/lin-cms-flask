@@ -1,8 +1,8 @@
 from flask import request
-from app.lin import DocResponse, Failed, ParameterError, Redprint, db, lin_config, login_required
 from werkzeug.local import LocalProxy
 
 from app.api import AuthorizationBearerSecurity, api
+from app.lin import DocResponse, Failed, ParameterError, Redprint, db, lin_config, login_required
 
 from .exception import ImageNotFound
 from .model import COS

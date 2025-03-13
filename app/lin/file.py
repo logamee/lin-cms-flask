@@ -1,12 +1,13 @@
 """
-    uploader of Lin
-    ~~~~~~~~~
+uploader of Lin
+~~~~~~~~~
 
-    uploader 模块，使用策略模式实现的上传文件接口
+uploader 模块，使用策略模式实现的上传文件接口
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 import hashlib
 import os
 
@@ -93,34 +94,16 @@ class Uploader(object):
         :return: None
         """
         default_config = current_app.config.get("FILE")
-        self._include = (
-            custom_config["INCLUDE"]
-            if "INCLUDE" in custom_config
-            else default_config["INCLUDE"]
-        )
-        self._exclude = (
-            custom_config["EXCLUDE"]
-            if "EXCLUDE" in custom_config
-            else default_config["EXCLUDE"]
-        )
+        self._include = custom_config["INCLUDE"] if "INCLUDE" in custom_config else default_config["INCLUDE"]
+        self._exclude = custom_config["EXCLUDE"] if "EXCLUDE" in custom_config else default_config["EXCLUDE"]
         self._single_limit = (
-            custom_config["SINGLE_LIMIT"]
-            if "SINGLE_LIMIT" in custom_config
-            else default_config["SINGLE_LIMIT"]
+            custom_config["SINGLE_LIMIT"] if "SINGLE_LIMIT" in custom_config else default_config["SINGLE_LIMIT"]
         )
         self._total_limit = (
-            custom_config["TOTAL_LIMIT"]
-            if "TOTAL_LIMIT" in custom_config
-            else default_config["TOTAL_LIMIT"]
+            custom_config["TOTAL_LIMIT"] if "TOTAL_LIMIT" in custom_config else default_config["TOTAL_LIMIT"]
         )
-        self._nums = (
-            custom_config["NUMS"] if "NUMS" in custom_config else default_config["NUMS"]
-        )
-        self._store_dir = (
-            custom_config["STORE_DIR"]
-            if "STORE_DIR" in custom_config
-            else default_config["STORE_DIR"]
-        )
+        self._nums = custom_config["NUMS"] if "NUMS" in custom_config else default_config["NUMS"]
+        self._store_dir = custom_config["STORE_DIR"] if "STORE_DIR" in custom_config else default_config["STORE_DIR"]
 
     @staticmethod
     def __parse_files(files):
@@ -168,18 +151,12 @@ class Uploader(object):
         """
         if (self._include and self._exclude) or self._include:
             for single in self._file_storage:
-                if (
-                    "." not in single.filename
-                    or single.filename.lower().rsplit(".", 1)[1] not in self._include
-                ):
+                if "." not in single.filename or single.filename.lower().rsplit(".", 1)[1] not in self._include:
                     raise FileExtensionError()
             return True
         elif self._exclude and not self._include:
             for single in self._file_storage:
-                if (
-                    "." not in single.filename
-                    or single.filename.lower().rsplit(".", 1)[1] in self._exclude
-                ):
+                if "." not in single.filename or single.filename.lower().rsplit(".", 1)[1] in self._exclude:
                     raise FileExtensionError()
             return True
 
@@ -194,9 +171,7 @@ class Uploader(object):
             total_size = 0
             for single in self._file_storage:
                 if self._get_size(single) > self._single_limit:
-                    raise FileTooLarge(
-                        single.filename + "大小不能超过" + str(self._single_limit) + "字节"
-                    )
+                    raise FileTooLarge(single.filename + "大小不能超过" + str(self._single_limit) + "字节")
                 total_size += self._get_size(single)
             if total_size > self._total_limit:
                 raise FileTooLarge()

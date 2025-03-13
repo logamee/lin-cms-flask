@@ -1,7 +1,8 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from .apidoc import BaseModel, DocResponse, SpecTree
 from .config import global_config, lin_config
 from .db import db
