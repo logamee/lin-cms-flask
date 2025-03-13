@@ -1,6 +1,6 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 import os
@@ -49,7 +49,7 @@ def load_app_config(app):
     根据指定配置环境自动加载对应环境变量和配置类到app config
     """
     # 根据传入环境加载对应配置
-    env = app.config.get("ENV")
+    env = os.environ.get("FLASK_ENV")
     # 读取 .env
     load_dotenv(os.path.join(basedir, ".{env}.env").format(env=env))
     # 读取配置类
@@ -68,9 +68,15 @@ def set_global_config(**kwargs):
 def create_app(register_all=True, **kwargs):
     # 全局配置优先生效
     set_global_config(**kwargs)
-    # http wsgi server托管启动需指定读取环境配置
-    load_dotenv(os.path.join(basedir, ".flaskenv"))
+
     app = Flask(__name__, static_folder=os.path.join(basedir, "assets"))
+    # http wsgi server托管启动需指定读取环境配置
+    # Load .flaskenv file
+    flaskenv_path = os.path.join(basedir, ".flaskenv")
+    if os.path.exists(flaskenv_path):
+        load_dotenv(flaskenv_path)
+    else:
+        print(f"Warning: {flaskenv_path} not found")
     load_app_config(app)
     if register_all:
         from app.lin import Lin

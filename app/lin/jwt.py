@@ -1,22 +1,17 @@
 """
-    jwt(Json Web Token) of Lin
-    ~~~~~~~~~
+jwt(Json Web Token) of Lin
+~~~~~~~~~
 
-    jwt implement for Lin.
+jwt implement for Lin.
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from functools import wraps
 
 from flask import request
-from flask_jwt_extended import (
-    JWTManager,
-    create_access_token,
-    create_refresh_token,
-    get_current_user,
-)
+from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, get_current_user
 from flask_jwt_extended.view_decorators import jwt_required
 
 from .exception import NotFound, TokenExpired, TokenInvalid, UnAuthentication
@@ -111,9 +106,7 @@ def add_claims_to_access_token(identity):
     return {
         "uid": identity["uid"],
         "scope": identity["scope"],
-        "remote_addr": identity["remote_addr"]
-        if "remote_addr" in identity.keys()
-        else None,
+        "remote_addr": identity["remote_addr"] if "remote_addr" in identity.keys() else None,
     }
 
 
@@ -126,7 +119,7 @@ def verify_refresh_token():
 
 
 def __verify_token(request_type):
-    1/0
+    1 / 0
     from flask import request
     from flask_jwt_extended.config import config
     from flask_jwt_extended.utils import verify_token_claims

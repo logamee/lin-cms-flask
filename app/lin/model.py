@@ -21,9 +21,7 @@ from .interface import (
 class Group(GroupInterface):
     @classmethod
     def count_by_id(cls, id) -> int:
-        result = db.session.query(func.count(cls.id)).filter(
-            cls.id == id, cls.is_deleted == False
-        )
+        result = db.session.query(func.count(cls.id)).filter(cls.id == id, cls.is_deleted == False)
         count = result.scalar()
         return count
 
@@ -61,18 +59,14 @@ class User(UserInterface):
 
     @classmethod
     def count_by_id(cls, uid) -> int:
-        result = db.session.query(func.count(cls.id)).filter(
-            cls.id == uid, cls.is_deleted == False
-        )
+        result = db.session.query(func.count(cls.id)).filter(cls.id == uid, cls.is_deleted == False)
         count = result.scalar()
         return count
 
     @staticmethod
     def count_by_id_and_group_name(user_id, group_name) -> int:
         stmt = (
-            db.session.query(manager.group_model.id.label("group_id"))
-            .filter_by(soft=True, name=group_name)
-            .subquery()
+            db.session.query(manager.group_model.id.label("group_id")).filter_by(soft=True, name=group_name).subquery()
         )
         result = db.session.query(func.count(manager.user_group_model.id)).filter(
             manager.user_group_model.user_id == user_id,
@@ -83,10 +77,7 @@ class User(UserInterface):
 
     @property
     def is_admin(self):
-        return (
-            manager.user_group_model.get(user_id=self.id).group_id
-            == GroupLevelEnum.ROOT.value
-        )
+        return manager.user_group_model.get(user_id=self.id).group_id == GroupLevelEnum.ROOT.value
 
     @property
     def is_active(self):

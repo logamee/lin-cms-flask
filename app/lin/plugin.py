@@ -1,11 +1,11 @@
 """
-    plugin of Lin
-    ~~~~~~~~~
+plugin of Lin
+~~~~~~~~~
 
-    Plugin Class of Lin, which you can access plugins in the manager.
+Plugin Class of Lin, which you can access plugins in the manager.
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 

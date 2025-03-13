@@ -1,6 +1,7 @@
-from app.lin import Form
 from wtforms import IntegerField, StringField
 from wtforms.validators import DataRequired, Optional
+
+from app.lin import Form
 
 
 class PoemListForm(Form):

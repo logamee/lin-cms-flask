@@ -1,11 +1,11 @@
 """
-    config class of Lin
-    ~~~~~~~~~
+config class of Lin
+~~~~~~~~~
 
-    This module implements a config class
+This module implements a config class
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from collections import defaultdict

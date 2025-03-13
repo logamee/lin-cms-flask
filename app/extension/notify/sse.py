@@ -1,11 +1,11 @@
 """
-    sse of Lin
-    ~~~~~~~~~
+sse of Lin
+~~~~~~~~~
 
-    sse 实现类
+sse 实现类
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 import json

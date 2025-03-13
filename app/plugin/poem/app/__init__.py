@@ -1,15 +1,15 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from .controller import api
 from .model import Poem
 
 
 def initial_data():
-    from app.lin import db
-
     from app import create_app
+    from app.lin import db
 
     app = create_app()
     with app.app_context():
@@ -23,7 +23,9 @@ def initial_data():
             poem1.title = "生查子·元夕"
             poem1.author = "欧阳修"
             poem1.dynasty = "宋代"
-            poem1._content = """去年元夜时/花市灯如昼/月上柳梢头/人约黄昏后|今年元夜时/月与灯依旧/不见去年人/泪湿春衫袖"""
+            poem1._content = (
+                """去年元夜时/花市灯如昼/月上柳梢头/人约黄昏后|今年元夜时/月与灯依旧/不见去年人/泪湿春衫袖"""
+            )
             poem1.image = img_url
             db.session.add(poem1)
 
@@ -39,9 +41,7 @@ def initial_data():
             poem3.title = "春望词四首"
             poem3.author = "薛涛"
             poem3.dynasty = "唐代"
-            poem3._content = (
-                """花开不同赏/花落不同悲/欲问相思处/花开花落时/揽草结同心/将以遗知音/春愁正断绝/春鸟复哀吟/风花日将老/佳期犹渺渺/不结同心人/空结同心草/那堪花满枝/翻作两相思/玉箸垂朝镜/春风知不知"""
-            )
+            poem3._content = """花开不同赏/花落不同悲/欲问相思处/花开花落时/揽草结同心/将以遗知音/春愁正断绝/春鸟复哀吟/风花日将老/佳期犹渺渺/不结同心人/空结同心草/那堪花满枝/翻作两相思/玉箸垂朝镜/春风知不知"""
             poem3.image = img_url
             db.session.add(poem3)
 
@@ -65,7 +65,9 @@ def initial_data():
             poem6.title = "浣溪沙"
             poem6.author = "晏殊"
             poem6.dynasty = "宋代"
-            poem6._content = """一曲新词酒一杯/去年天气旧亭台/夕阳西下几时回|无可奈何花落去/似曾相识燕归来/小园香径独徘徊"""
+            poem6._content = (
+                """一曲新词酒一杯/去年天气旧亭台/夕阳西下几时回|无可奈何花落去/似曾相识燕归来/小园香径独徘徊"""
+            )
             poem6.image = img_url
             db.session.add(poem6)
 
@@ -73,7 +75,9 @@ def initial_data():
             poem7.title = "浣溪沙"
             poem7.author = "纳兰性德"
             poem7.dynasty = "清代"
-            poem7._content = """残雪凝辉冷画屏/落梅横笛已三更/更无人处月胧明|我是人间惆怅客/知君何事泪纵横/断肠声里忆平生"""
+            poem7._content = (
+                """残雪凝辉冷画屏/落梅横笛已三更/更无人处月胧明|我是人间惆怅客/知君何事泪纵横/断肠声里忆平生"""
+            )
             poem7.image = img_url
             db.session.add(poem7)
 

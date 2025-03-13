@@ -1,8 +1,8 @@
 """
-    register api to admin blueprint
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+register api to admin blueprint
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from flask import Blueprint

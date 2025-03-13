@@ -4,14 +4,17 @@ from enum import Enum
 from typing import Iterable
 
 from flask import json, jsonify
-from flask.json import JSONEncoder as _JSONEncoder
+from flask.json.provider import DefaultJSONProvider
 from flask.wrappers import Response
 
 from .apidoc import BaseModel
 from .db import Record, RecordCollection
+from .exception import APIException
 
 
-class JSONEncoder(_JSONEncoder):
+class JSONEncoder(DefaultJSONProvider):
+    ensure_ascii = False
+
     def default(self, o):
         if isinstance(o, BaseModel):
             if hasattr(o, "__root__") and o.__root__.__class__.__name__ in (

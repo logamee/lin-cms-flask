@@ -1,9 +1,10 @@
 """
-    exceptions of Lin
-    ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+exceptions of Lin
+~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from flask import json, request
 from werkzeug.exceptions import HTTPException
 
@@ -21,9 +22,7 @@ class APIException(HTTPException):
         # 1. 没有参数
         if len(args) == 0:
             self.message = (
-                global_config.get("MESSAGE", dict()).get(
-                    self.message_code, self.message
-                )
+                global_config.get("MESSAGE", dict()).get(self.message_code, self.message)
                 if self._config
                 else self.message
             )
@@ -32,9 +31,7 @@ class APIException(HTTPException):
             if isinstance(args[0], int):
                 self.message_code = args[0]
                 self.message = (
-                    global_config.get("MESSAGE", dict()).get(
-                        self.message_code, self.message
-                    )
+                    global_config.get("MESSAGE", dict()).get(self.message_code, self.message)
                     if self._config
                     else self.message
                 )

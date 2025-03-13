@@ -1,5 +1,6 @@
-from app.lin import BaseCrud
 from sqlalchemy import Column, Integer, String
+
+from app.lin import BaseCrud
 
 
 class Qiniu(BaseCrud):

@@ -1,7 +1,8 @@
 import hashlib
 
-from app.lin import BaseCrud, lin_config
 from sqlalchemy import Column, Integer, String, text
+
+from app.lin import BaseCrud, lin_config
 
 
 class COS(BaseCrud):
@@ -30,7 +31,7 @@ class COS(BaseCrud):
     def generate_key(filename: str):
         dir_name = lin_config.get_config("cos.upload_folder")
         file_key = COS._generate_uuid() + COS._get_ext(filename)
-        return dir_name + '/' + file_key if dir_name else file_key
+        return dir_name + "/" + file_key if dir_name else file_key
 
     @staticmethod
     def generate_md5(data: bytes):
@@ -48,7 +49,7 @@ class COS(BaseCrud):
         :param file_key: 文件名
         :return: 文件的字节数
         """
-        return client.head_object(Bucket=bucket, Key=file_key).get('Content-Length', None)
+        return client.head_object(Bucket=bucket, Key=file_key).get("Content-Length", None)
 
     @staticmethod
     def get_url(client, bucket, file_key) -> str:
@@ -71,10 +72,7 @@ class COS(BaseCrud):
         :return: 文件的临时访问链接
         """
         return client.get_presigned_url(
-            Method='GET',
-            Bucket=bucket,
-            Key=file_key,
-            Expired=lin_config.get_config("cos.expire_time")
+            Method="GET", Bucket=bucket, Key=file_key, Expired=lin_config.get_config("cos.expire_time")
         )
 
     @staticmethod

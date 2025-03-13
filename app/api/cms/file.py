@@ -1,12 +1,13 @@
 """
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from flask import Blueprint, request
-from app.lin import login_required
 
 from app.api import AuthorizationBearerSecurity, api
 from app.extension.file.local_uploader import LocalUploader
+from app.lin import login_required
 
 file_api = Blueprint("file", __name__)
 

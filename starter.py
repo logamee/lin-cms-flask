@@ -1,7 +1,7 @@
 """
-        :copyright: © 2020 by the Lin team.
-        :license: MIT, see LICENSE for more details.
-    """
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
+"""
 
 from app import create_app
 from app.api.cms.model.group import Group
@@ -10,6 +10,7 @@ from app.api.cms.model.permission import Permission
 from app.api.cms.model.user import User
 from app.api.cms.model.user_group import UserGroup
 from app.api.cms.model.user_identity import UserIdentity
+from app.api.v1.model.book import Book
 from app.config.code_message import MESSAGE
 
 app = create_app(
@@ -21,6 +22,11 @@ app = create_app(
     user_group_model=UserGroup,
     config_MESSAGE=MESSAGE,
 )
+
+
+@app.route("/hello")
+def hello():
+    return Book.get(one=True)
 
 
 if app.config.get("ENV") != "production":

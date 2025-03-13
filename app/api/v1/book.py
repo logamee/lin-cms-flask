@@ -1,17 +1,17 @@
 """
-    a standard CRUD template of book
-    通过 图书 来实现一套标准的 CRUD 功能，供学习
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+a standard CRUD template of book
+通过 图书 来实现一套标准的 CRUD 功能，供学习
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 
 from flask import Blueprint, g
-from app.lin import DocResponse, Success, group_required, login_required, permission_meta
 
 from app.api import AuthorizationBearerSecurity, api
 from app.api.v1.exception import BookNotFound
 from app.api.v1.model.book import Book
 from app.api.v1.schema import BookInSchema, BookOutSchema, BookQuerySearchSchema, BookSchemaList
+from app.lin import DocResponse, Success, group_required, login_required, permission_meta
 
 book_api = Blueprint("book", __name__)
 
@@ -67,7 +67,7 @@ def create_book(json: BookInSchema):
     创建图书
     """
     Book.create(**json.dict(), commit=True)
-    return Success(12)
+    raise Success(12)
 
 
 @book_api.route("/<int:id>", methods=["PUT"])
@@ -88,7 +88,7 @@ def update_book(id, json: BookInSchema):
             **json.dict(),
             commit=True,
         )
-        return Success(13)
+        raise Success(13)
     raise BookNotFound
 
 
@@ -108,5 +108,5 @@ def delete_book(id):
     if book:
         # 删除图书，软删除
         book.delete(commit=True)
-        return Success(14)
+        raise Success(14)
     raise BookNotFound

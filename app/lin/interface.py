@@ -1,26 +1,16 @@
 # coding: utf-8
 """
-    Some model interfaces of Lin
-    ~~~~~~~~~
+Some model interfaces of Lin
+~~~~~~~~~
 
-    interface means you must implement the necessary methods and inherit properties.
+interface means you must implement the necessary methods and inherit properties.
 
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
 from datetime import datetime
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Index,
-    Integer,
-    SmallInteger,
-    String,
-    func,
-    text,
-)
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, SmallInteger, String, func, text
 
 from .db import MixinJSONSerializer, db
 from .enums import GroupLevelEnum
@@ -85,16 +75,9 @@ class BaseCrud(db.Model, MixinJSONSerializer):
 class InfoCrud(db.Model, MixinJSONSerializer):
     __abstract__ = True
     create_time = Column(DateTime(timezone=True), server_default=func.now())
-    update_time = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    update_time = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     delete_time = Column(DateTime(timezone=True))
     is_deleted = Column(Boolean, nullable=False, default=False)
-
-    def __init__(self):
-        name: str = self.__class__.__name__
-        if not hasattr(self, "__tablename__"):
-            self.__tablename__ = camel2line(name)
 
     def _set_fields(self):
         self._exclude = ["delete_time", "is_deleted"]

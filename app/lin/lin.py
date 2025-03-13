@@ -1,9 +1,10 @@
 """
-     core module of Lin.
-     ~~~~~~~~~
-    :copyright: © 2020 by the Lin team.
-    :license: MIT, see LICENSE for more details.
+ core module of Lin.
+ ~~~~~~~~~
+:copyright: © 2020 by the Lin team.
+:license: MIT, see LICENSE for more details.
 """
+
 from flask import Blueprint, Flask
 from sqlalchemy.exc import DatabaseError
 
@@ -172,6 +173,7 @@ class Lin(object):
                     raise e
 
     def enable_auto_jsonify(self, app):
-        app.json_encoder = self.jsonencoder or JSONEncoder
+        # app.json_encoder = self.jsonencoder or JSONEncoder
+        app.json = self.jsonencoder(app) if self.jsonencoder else JSONEncoder(app)
         app.make_response = auto_response(app.make_response)
         schema_response(app)
