@@ -1,9 +1,10 @@
-"""
- core module of Lin.
+""" core module of Lin.
  ~~~~~~~~~
 :copyright: © 2020 by the Lin team.
 :license: MIT, see LICENSE for more details.
 """
+
+from typing import Any, Dict, List, Optional, Type, Union, Callable
 
 from flask import Blueprint, Flask
 from sqlalchemy.exc import DatabaseError
@@ -21,21 +22,21 @@ from .utils import permission_meta_infos
 class Lin(object):
     def __init__(
         self,
-        app: Flask = None,  # flask app , default None
-        group_model=None,  # group model, default None
-        user_model=None,  # user model, default None
-        identity_model=None,  # user identity model,default None
-        permission_model=None,  # permission model, default None
-        group_permission_model=None,  # group permission 多对多关联模型
-        user_group_model=None,  # user group 多对多关联模型
-        jsonencoder=None,  # 序列化器
-        sync_permissions=True,  # create db table if not exist and sync permissions, default True
-        mount=True,  # 是否挂载默认的蓝图, default True
-        handle=True,  # 是否使用全局异常处理, default True
-        syslogger=True,  # 是否使用自定义系统运行日志，default True
-        **kwargs,  # 保留配置项
+        app: Optional[Flask] = None,  # flask app , default None
+        group_model: Optional[Any] = None,  # group model, default None
+        user_model: Optional[Any] = None,  # user model, default None
+        identity_model: Optional[Any] = None,  # user identity model,default None
+        permission_model: Optional[Any] = None,  # permission model, default None
+        group_permission_model: Optional[Any] = None,  # group permission 多对多关联模型
+        user_group_model: Optional[Any] = None,  # user group 多对多关联模型
+        jsonencoder: Optional[Type[JSONEncoder]] = None,  # 序列化器
+        sync_permissions: bool = True,  # create db table if not exist and sync permissions, default True
+        mount: bool = True,  # 是否挂载默认的蓝图, default True
+        handle: bool = True,  # 是否使用全局异常处理, default True
+        syslogger: bool = True,  # 是否使用自定义系统运行日志，default True
+        **kwargs: Any,  # 保留配置项
     ):
-        self.app = app
+        self.app: Optional[Flask] = app
         if app is not None:
             self.init_app(
                 app,
@@ -54,19 +55,19 @@ class Lin(object):
 
     def init_app(
         self,
-        app,
-        group_model=None,
-        user_model=None,
-        identity_model=None,
-        permission_model=None,
-        group_permission_model=None,
-        user_group_model=None,
-        jsonencoder=None,
-        sync_permissions=True,
-        mount=True,
-        handle=True,
-        syslogger=True,
-    ):
+        app: Flask,
+        group_model: Optional[Any] = None,
+        user_model: Optional[Any] = None,
+        identity_model: Optional[Any] = None,
+        permission_model: Optional[Any] = None,
+        group_permission_model: Optional[Any] = None,
+        user_group_model: Optional[Any] = None,
+        jsonencoder: Optional[Type[JSONEncoder]] = None,
+        sync_permissions: bool = True,
+        mount: bool = True,
+        handle: bool = True,
+        syslogger: bool = True,
+    ) -> None:
         # load default lin db model if None
         if not group_model:
             from .model import Group
@@ -110,7 +111,7 @@ class Lin(object):
         self.enable_auto_jsonify(app)
         self.app = app
         # 初始化 manager
-        self.manager = Manager(
+        self.manager: Manager = Manager(
             app.config.get("PLUGIN_PATH", dict()),
             group_model=group_model,
             user_model=user_model,
@@ -127,7 +128,7 @@ class Lin(object):
         handle and self.handle_error(app)
         syslogger and SysLogger(app)
 
-    def sync_permissions(self, app):
+    def sync_permissions(self, app: Flask) -> None:
         # 挂载后才能获取代码中的权限
         # 多进程/线程下可能同时写入相同数据，由权限表联合唯一约束限制
         try:
@@ -136,7 +137,7 @@ class Lin(object):
         except DatabaseError:
             pass
 
-    def mount(self, app):
+    def mount(self, app: Flask) -> None:
         # 加载默认插件路由
         bp = Blueprint("plugin", __name__)
         # 加载插件的路由
@@ -153,9 +154,9 @@ class Lin(object):
             if info:
                 self.manager.ep_meta.setdefault(ep, info)
 
-    def handle_error(self, app):
+    def handle_error(self, app: Flask) -> None:
         @app.errorhandler(Exception)
-        def handler(e):
+        def handler(e: Exception) -> Any:
             if isinstance(e, APIException):
                 return e
             if isinstance(e, HTTPException):
@@ -172,7 +173,7 @@ class Lin(object):
                 else:
                     raise e
 
-    def enable_auto_jsonify(self, app):
+    def enable_auto_jsonify(self, app: Flask) -> None:
         # app.json_encoder = self.jsonencoder or JSONEncoder
         app.json = self.jsonencoder(app) if self.jsonencoder else JSONEncoder(app)
         app.make_response = auto_response(app.make_response)

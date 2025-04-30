@@ -24,10 +24,14 @@ jwt = JWTManager()
 identity = dict(uid=0, scope=SCOPE)
 
 
-def admin_required(fn):
+from typing import Callable, TypeVar
+
+F = TypeVar('F', bound=Callable[..., Any])
+
+def admin_required(fn: F) -> F:
     @wraps(fn)
     @jwt_required()
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         current_user = get_current_user()
         if not current_user.is_admin:
             raise UnAuthentication("只有超级管理员可操作")  # type: ignore
@@ -36,10 +40,10 @@ def admin_required(fn):
     return wrapper
 
 
-def group_required(fn):
+def group_required(fn: F) -> F:
     @wraps(fn)
     @jwt_required()
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         current_user = get_current_user()
         # check current user is active or not
         # 判断当前用户是否为激活状态
@@ -62,10 +66,10 @@ def group_required(fn):
     return wrapper
 
 
-def login_required(fn):
+def login_required(fn: F) -> F:
     @wraps(fn)
     @jwt_required()
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         _check_is_active(current_user=get_current_user())
         return fn(*args, **kwargs)
 

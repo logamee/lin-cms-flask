@@ -28,43 +28,46 @@ from .utils import camel2line
 Base = declarative_base()
 
 
-class MixinJSONSerializer:
+class MixinJSONSerializer(Base):
+
+    _fields: list[str] = []
+    _exclude: list[str] = []
 
     @declared_attr.directive
-    def __tablename__(cls):
-        name = None
+    def __tablename__(cls) -> str | None:
+        name: str | None = None
         if not has_inherited_table(cls):
             name = camel2line(cls.__name__)
         return name
 
     @orm.reconstructor
-    def init_on_load(self):
+    def init_on_load(self) -> None:
         self._fields = []
         self._exclude = []
-
         self._set_fields()
         self.__prune_fields()
 
-    def _set_fields(self):
+    def _set_fields(self) -> None:
         pass
 
-    def __prune_fields(self):
-        columns = inspect(self.__class__).columns  # type: ignore
+    def __prune_fields(self) -> None:
+        columns = inspect(self.__class__).columns
         if not self._fields:
-            all_columns = set([column.name for column in columns])
+            all_columns = {column.name for column in columns}
             self._fields = list(all_columns - set(self._exclude))
 
-    def hide(self, *args):
+    def hide(self, *args: str) -> "MixinJSONSerializer":
         for key in args:
-            self._fields.remove(key)
+            if key in self._fields:
+                self._fields.remove(key)
         return self
 
-    def keys(self):
+    def keys(self) -> list[str]:
         if not hasattr(self, "_fields"):
             self.init_on_load()
         return self._fields
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
 
 
@@ -159,13 +162,13 @@ class Record(object):
         return self.dataset.export(format, **kwargs)
 
 
-class RecordCollection(object):
-    """A set of excellent Records from a query."""
+class RecordCollection:
+    """查询结果记录集合"""
 
-    def __init__(self, rows):
+    def __init__(self, rows: Iterator[Record] | list[Record]) -> None:
         self._rows = rows
-        self._all_rows = []
-        self.pending = True
+        self._all_rows: list[Record] = []
+        self.pending: bool = True
 
     def __repr__(self):
         return "<RecordCollection size={} pending={}>".format(len(self), self.pending)
@@ -247,9 +250,8 @@ class RecordCollection(object):
 
         return data
 
-    def all(self, as_dict=False, as_ordereddict=False):
-        """Returns a list of all rows for the RecordCollection. If they haven't
-        been fetched yet, consume the iterator and cache the results."""
+    def all(self, as_dict: bool = False, as_ordereddict: bool = False) -> list[Record] | list[dict]:
+        """获取全部结果记录"""
 
         # By calling list it calls the __iter__ method
         rows = list(self)
@@ -309,12 +311,14 @@ class RecordCollection(object):
 
 
 class Database(SQLAlchemy):
-    def __init__(self, **kwargs):
-        self.open = True
-        super(Database, self).__init__(**kwargs)
+    open: bool
 
-    def get_engine(self):
-        # Return the engine if open
+    def __init__(self, **kwargs: Any) -> None:
+        self.open = True
+        super().__init__(**kwargs)
+
+    def get_engine(self) -> Engine:
+        """获取SQLAlchemy引擎"""
         if not self.open:
             raise exc.ResourceClosedError("Database closed.")
         return self.engine
@@ -339,13 +343,10 @@ class Database(SQLAlchemy):
         # Setup SQLAlchemy for Database inspection.
         return inspect(self.engine).get_table_names(**kwargs)
 
-    def get_connection(self, close_with_result=False):
-        """Get a connection to this Database. Connections are retrieved from a
-        pool.
-        """
+    def get_connection(self, close_with_result: bool = False) -> Connection:
+        """获取数据库连接"""
         if not self.open:
             raise exc.ResourceClosedError("Database closed.")
-
         return Connection(self.engine.connect(), close_with_result=close_with_result)
 
     def query(self, query, fetchall=False, **params):
@@ -356,8 +357,8 @@ class Database(SQLAlchemy):
         with self.get_connection(True) as conn:
             return conn.query(query, fetchall, **params)
 
-    def bulk_query(self, query, *multiparams):
-        """Bulk insert or update."""
+    def bulk_query(self, query: str, *multiparams: Any) -> None:
+        """批量执行插入/更新操作"""
 
         with self.get_connection() as conn:
             conn.bulk_query(query, *multiparams)
@@ -398,13 +399,13 @@ class Database(SQLAlchemy):
             raise e
 
 
-class Connection(object):
+class Connection:
     """A Database connection."""
 
-    def __init__(self, connection, close_with_result=False):
+    def __init__(self, connection: Engine, close_with_result: bool = False) -> None:
         self._conn = connection
-        self.open = not connection.closed
-        self._close_with_result = close_with_result
+        self.open: bool = not connection.closed
+        self._close_with_result: bool = close_with_result
 
     def close(self):
         # No need to close if this connection is used for a single result.
@@ -422,11 +423,8 @@ class Connection(object):
     def __repr__(self):
         return "<Connection open={}>".format(self.open)
 
-    def query(self, query, fetchall=False, **params):
-        """Executes the given SQL query against the connected Database.
-        Parameters can, optionally, be provided. Returns a RecordCollection,
-        which can be iterated over to get result rows as dictionaries.
-        """
+    def query(self, query: str, fetchall: bool = False, **params: Any) -> RecordCollection:
+        """执行SQL查询并返回记录集合"""
 
         # Execute the given query.
         cursor = self._conn.execute(text(query).bindparams(**params))  # TODO: PARAMS GO HERE
@@ -446,8 +444,8 @@ class Connection(object):
 
         return results
 
-    def bulk_query(self, query, *multiparams):
-        """Bulk insert or update."""
+    def bulk_query(self, query: str, *multiparams: Any) -> None:
+        """批量执行插入/更新操作"""
 
         self._conn.execute(text(query), *multiparams)
 
@@ -507,19 +505,24 @@ def _reduce_datetimes(row):
 
 
 class Query(BaseQuery):
-    def filter_by(self, soft=False, **kwargs):
-        # soft 应用软删除
+    def __init__(self, entities, session=None) -> None:
+        super().__init__(entities, session=session)
+
+    def filter_by(self, soft: bool = False, **kwargs: Any) -> "Query":
+        """增强filter_by支持软删除"""
         if soft:
             kwargs["is_deleted"] = False
-        return super(Query, self).filter_by(**kwargs)
+        return super().filter_by(**kwargs)
 
-    def get_or_404(self, ident):
+    def get_or_404(self, ident: Any) -> Any:
+        """根据ID获取记录或抛出404"""
         rv = self.get(ident)
         if not rv:
             raise NotFound()
         return rv
 
-    def first_or_404(self):
+    def first_or_404(self) -> Any:
+        """获取第一条记录或抛出404"""
         rv = self.first()
         if not rv:
             raise NotFound()

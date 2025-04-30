@@ -64,7 +64,7 @@ class User(UserInterface):
         return count
 
     @staticmethod
-    def count_by_id_and_group_name(user_id, group_name) -> int:
+    def count_by_id_and_group_name(user_id: int, group_name: str) -> int:
         stmt = (
             db.session.query(manager.group_model.id.label("group_id")).filter_by(soft=True, name=group_name).subquery()
         )
@@ -76,11 +76,11 @@ class User(UserInterface):
         return count
 
     @property
-    def is_admin(self):
+    def is_admin(self) -> bool:
         return manager.user_group_model.get(user_id=self.id).group_id == GroupLevelEnum.ROOT.value
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
         return True
 
     @property
