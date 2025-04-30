@@ -9,6 +9,7 @@ jwt implement for Lin.
 """
 
 from functools import wraps
+from typing import Any, Callable, TypeVar
 
 from flask import request
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, get_current_user
@@ -24,9 +25,8 @@ jwt = JWTManager()
 identity = dict(uid=0, scope=SCOPE)
 
 
-from typing import Callable, TypeVar
+F = TypeVar("F", bound=Callable[..., Any])
 
-F = TypeVar('F', bound=Callable[..., Any])
 
 def admin_required(fn: F) -> F:
     @wraps(fn)

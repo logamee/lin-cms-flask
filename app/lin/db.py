@@ -9,6 +9,7 @@ import os
 from collections import OrderedDict
 from contextlib import contextmanager
 from inspect import isclass
+from typing import Any, Iterator
 
 import tablib
 from flask import json
@@ -28,10 +29,7 @@ from .utils import camel2line
 Base = declarative_base()
 
 
-class MixinJSONSerializer(Base):
-
-    _fields: list[str] = []
-    _exclude: list[str] = []
+class MixinJSONSerializer:
 
     @declared_attr.directive
     def __tablename__(cls) -> str | None:
@@ -311,13 +309,12 @@ class RecordCollection:
 
 
 class Database(SQLAlchemy):
-    open: bool
 
     def __init__(self, **kwargs: Any) -> None:
         self.open = True
         super().__init__(**kwargs)
 
-    def get_engine(self) -> Engine:
+    def get_engine(self):
         """获取SQLAlchemy引擎"""
         if not self.open:
             raise exc.ResourceClosedError("Database closed.")
@@ -343,7 +340,7 @@ class Database(SQLAlchemy):
         # Setup SQLAlchemy for Database inspection.
         return inspect(self.engine).get_table_names(**kwargs)
 
-    def get_connection(self, close_with_result: bool = False) -> Connection:
+    def get_connection(self, close_with_result: bool = False):
         """获取数据库连接"""
         if not self.open:
             raise exc.ResourceClosedError("Database closed.")
@@ -402,7 +399,7 @@ class Database(SQLAlchemy):
 class Connection:
     """A Database connection."""
 
-    def __init__(self, connection: Engine, close_with_result: bool = False) -> None:
+    def __init__(self, connection, close_with_result: bool = False) -> None:
         self._conn = connection
         self.open: bool = not connection.closed
         self._close_with_result: bool = close_with_result

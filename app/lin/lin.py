@@ -1,10 +1,10 @@
-""" core module of Lin.
+"""core module of Lin.
  ~~~~~~~~~
 :copyright: © 2020 by the Lin team.
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Any, Dict, List, Optional, Type, Union, Callable
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from flask import Blueprint, Flask
 from sqlalchemy.exc import DatabaseError

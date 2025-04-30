@@ -9,6 +9,7 @@ interface means you must implement the necessary methods and inherit properties.
 :license: MIT, see LICENSE for more details.
 """
 from datetime import datetime
+from typing import Any, List, Optional, Self, Union
 
 from sqlalchemy import Boolean, Column, DateTime, Index, Integer, SmallInteger, String, func, text
 
@@ -42,8 +43,9 @@ class BaseCrud(db.Model, MixinJSONSerializer):
 
     # 查
     @classmethod
-    def get(cls, start: Optional[int] = None, count: Optional[int] = None, 
-            one: bool = True, **kwargs) -> Union[Optional[Self], List[Self]]:
+    def get(
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs
+    ) -> Union[Optional[Self], List[Self]]:
         if one:
             return cls.query.filter().filter_by(**kwargs).first()
         return cls.query.filter().filter_by(**kwargs).offset(start).limit(count).all()
