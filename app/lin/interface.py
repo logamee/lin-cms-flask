@@ -42,14 +42,15 @@ class BaseCrud(db.Model, MixinJSONSerializer):
 
     # 查
     @classmethod
-    def get(cls, start=None, count=None, one=True, **kwargs):
+    def get(cls, start: Optional[int] = None, count: Optional[int] = None, 
+            one: bool = True, **kwargs) -> Union[Optional[Self], List[Self]]:
         if one:
             return cls.query.filter().filter_by(**kwargs).first()
         return cls.query.filter().filter_by(**kwargs).offset(start).limit(count).all()
 
     # 增
     @classmethod
-    def create(cls, **kwargs):
+    def create(cls, **kwargs: Any) -> Self:
         one = cls()
         for key in kwargs.keys():
             if hasattr(one, key):
@@ -59,7 +60,7 @@ class BaseCrud(db.Model, MixinJSONSerializer):
             db.session.commit()
         return one
 
-    def update(self, **kwargs):
+    def update(self, commit: bool = False) -> Self:
         for key in kwargs.keys():
             if hasattr(self, key):
                 setattr(self, key, kwargs[key])

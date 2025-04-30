@@ -10,6 +10,7 @@ logger模块，用户行为日志记录器
 
 import re
 from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, cast
 
 from flask import Response, request
 from flask_jwt_extended import get_current_user
@@ -18,6 +19,8 @@ from sqlalchemy import Column, Integer, String, func
 from .db import db
 from .interface import InfoCrud
 from .manager import manager
+
+F = TypeVar('F', bound=Callable[..., Any])
 
 
 class Log(InfoCrud):
@@ -33,15 +36,15 @@ class Log(InfoCrud):
     permission = Column(String(100), comment="访问哪个权限")
 
     @property
-    def time(self):
+    def time(self) -> int:
         return int(round(self.create_time.timestamp() * 1000))
 
     @classmethod
-    def select_by_conditions(cls, **kwargs) -> list:
+    def select_by_conditions(cls, **kwargs: Any) -> List['Log']:
         """
         根据条件筛选日志，条件的可以是所有表内字段，以及start, end 时间段，keyword模糊匹配message字段
         """
-        conditions = dict()
+        conditions: Dict[str, Any] = dict()
         # 过滤 传入参数
         avaliable_keys = [c for c in vars(Log).keys() if not c.startswith("_")] + [
             "start",
@@ -68,7 +71,7 @@ class Log(InfoCrud):
         return logs
 
     @classmethod
-    def get_usernames(cls) -> list:
+    def get_usernames(cls) -> List[str]:
         result = (
             db.session.query(cls.username)
             .filter(cls.is_deleted == False)
@@ -80,7 +83,7 @@ class Log(InfoCrud):
         return usernames
 
     @staticmethod
-    def create_log(**kwargs):
+    def create_log(**kwargs: Any) -> 'Log':
         log = Log()
         for key in kwargs.keys():
             if hasattr(log, key):
@@ -101,20 +104,20 @@ class Logger(object):
     """
 
     # message template
-    template = None
+    template: Optional[str] = None
 
-    def __init__(self, template=None):
+    def __init__(self, template: Optional[str] = None):
         if template:
             self.template: str = template
         elif self.template is None:
             raise Exception("template must not be None!")
-        self.message = ""
-        self.response = None
-        self.user = None
+        self.message: str = ""
+        self.response: Optional[Response] = None
+        self.user: Optional[Any] = None
 
-    def __call__(self, func):
+    def __call__(self, func: F) -> F:
         @wraps(func)
-        def wrap(*args, **kwargs):
+        def wrap(*args: Any, **kwargs: Any) -> Any:
             response: Response = func(*args, **kwargs)
             self.response = response
             self.user = get_current_user()
@@ -124,9 +127,9 @@ class Logger(object):
             self.write_log()
             return response
 
-        return wrap
+        return cast(F, wrap)
 
-    def write_log(self):
+    def write_log(self) -> None:
         info = manager.find_info_by_ep(request.endpoint)
         permission = info.name if info is not None else ""
         status_code = getattr(self.response, "status_code", None)
@@ -146,7 +149,7 @@ class Logger(object):
         )
 
     # 解析自定义模板
-    def _parse_template(self):
+    def _parse_template(self) -> str:
         message = self.template
         total = re.findall(REG_XP, message)
         for it in total:

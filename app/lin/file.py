@@ -1,5 +1,4 @@
-"""
-uploader of Lin
+"""uploader of Lin
 ~~~~~~~~~
 
 uploader 模块，使用策略模式实现的上传文件接口
@@ -8,6 +7,7 @@ uploader 模块，使用策略模式实现的上传文件接口
 :license: MIT, see LICENSE for more details.
 """
 
+from typing import Dict, List, Optional, Tuple, Union, Any
 import hashlib
 import os
 
@@ -18,45 +18,45 @@ from .exception import FileExtensionError, FileTooLarge, FileTooMany, ParameterE
 
 
 class Uploader(object):
-    def __init__(self, files: list or FileStorage, config={}):
+    def __init__(self, files: Union[List[FileStorage], FileStorage], config: Dict[str, Any] = {}):
         #: the list of allowed files
         #: 被允许的文件类型列表
-        self._include = []
+        self._include: List[str] = []
         #: the list of not allowed files
         #: 不被允许的文件类型列表
-        self._exclude = []
+        self._exclude: List[str] = []
         #: the max bytes of single file
         #: 单个文件的最大字节数
-        self._single_limit = 0
+        self._single_limit: int = 0
         #: the max bytes of multiple files
         #: 多个文件的最大字节数
-        self._total_limit = 0
+        self._total_limit: int = 0
         #: the max nums of files
         #: 文件上传的最大数量
-        self._nums = 0
+        self._nums: int = 0
         #: the directory of file storage
         #: 文件存贮目录
-        self._store_dir = ""
+        self._store_dir: str = ""
         #: the FileStorage Object
         #: 文件存贮对象
-        self._file_storage = self.__parse_files(files)
+        self._file_storage: List[FileStorage] = self.__parse_files(files)
         self.__load_config(config)
         self.__verify()
 
-    def upload(self, **kwargs) -> dict:
+    def upload(self, **kwargs) -> Dict[str, Any]:
         """
         文件上传抽象方法，一定要被子类所实现
         """
         raise NotImplementedError()
 
     @staticmethod
-    def _generate_uuid():
+    def _generate_uuid() -> str:
         import uuid
 
         return str(uuid.uuid1())
 
     @staticmethod
-    def _get_ext(filename: str):
+    def _get_ext(filename: str) -> str:
         """
         得到文件的扩展名
         :param filename: 原始文件名
@@ -65,14 +65,14 @@ class Uploader(object):
         return "." + filename.lower().split(".")[-1]
 
     @staticmethod
-    def _generate_md5(data: bytes):
+    def _generate_md5(data: bytes) -> str:
         md5_obj = hashlib.md5()
         md5_obj.update(data)
         ret = md5_obj.hexdigest()
         return ret
 
     @staticmethod
-    def _get_size(file_obj: FileStorage):
+    def _get_size(file_obj: FileStorage) -> int:
         """
         得到文件大小（字节）
         :param file_obj: 文件对象
@@ -84,10 +84,10 @@ class Uploader(object):
         return size
 
     @staticmethod
-    def _generate_name(filename: str):
+    def _generate_name(filename: str) -> str:
         return Uploader._generate_uuid() + Uploader._get_ext(filename)
 
-    def __load_config(self, custom_config):
+    def __load_config(self, custom_config: Dict[str, Any]) -> None:
         """
         加载文件配置，如果用户不传 config 参数，则加载默认配置
         :param custom_config: 用户自定义配置参数
@@ -106,13 +106,13 @@ class Uploader(object):
         self._store_dir = custom_config["STORE_DIR"] if "STORE_DIR" in custom_config else default_config["STORE_DIR"]
 
     @staticmethod
-    def __parse_files(files):
-        ret = []
+    def __parse_files(files: Union[List[FileStorage], FileStorage]) -> List[FileStorage]:
+        ret: List[FileStorage] = []
         for key, value in files.items():
             ret += files.getlist(key)
         return ret
 
-    def __verify(self):
+    def __verify(self) -> None:
         """
         验证文件是否合法
         """
@@ -121,7 +121,7 @@ class Uploader(object):
         self.__allowed_file()
         self.__allowed_file_size()
 
-    def _get_store_path(self, filename: str):
+    def _get_store_path(self, filename: str) -> Tuple[str, str, str]:
         uuid_filename = self._generate_name(filename)
         format_day = self.__get_format_day()
         store_dir = self._store_dir
@@ -131,7 +131,7 @@ class Uploader(object):
             uuid_filename,
         )
 
-    def mkdir_if_not_exists(self):
+    def mkdir_if_not_exists(self) -> None:
         if not os.path.isabs(self._store_dir):
             self._store_dir = os.path.abspath(self._store_dir)
         # mkdir by YYYY/MM/DD
@@ -140,12 +140,12 @@ class Uploader(object):
             os.makedirs(self._store_dir)
 
     @staticmethod
-    def __get_format_day():
+    def __get_format_day() -> str:
         import time
 
         return str(time.strftime("%Y/%m/%d"))
 
-    def __allowed_file(self):
+    def __allowed_file(self) -> bool:
         """
         验证扩展名是否合法
         """
@@ -159,8 +159,9 @@ class Uploader(object):
                 if "." not in single.filename or single.filename.lower().rsplit(".", 1)[1] in self._exclude:
                     raise FileExtensionError()
             return True
+        return False
 
-    def __allowed_file_size(self):
+    def __allowed_file_size(self) -> None:
         """
         验证文件大小是否合法
         """
