@@ -7,9 +7,9 @@ uploader 模块，使用策略模式实现的上传文件接口
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Dict, List, Optional, Tuple, Union, Any
 import hashlib
 import os
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from flask import current_app
 from werkzeug.datastructures import FileStorage

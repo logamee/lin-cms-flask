@@ -20,7 +20,7 @@ from .db import db
 from .interface import InfoCrud
 from .manager import manager
 
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class Log(InfoCrud):
@@ -40,7 +40,7 @@ class Log(InfoCrud):
         return int(round(self.create_time.timestamp() * 1000))
 
     @classmethod
-    def select_by_conditions(cls, **kwargs: Any) -> List['Log']:
+    def select_by_conditions(cls, **kwargs: Any) -> List["Log"]:
         """
         根据条件筛选日志，条件的可以是所有表内字段，以及start, end 时间段，keyword模糊匹配message字段
         """
@@ -83,7 +83,7 @@ class Log(InfoCrud):
         return usernames
 
     @staticmethod
-    def create_log(**kwargs: Any) -> 'Log':
+    def create_log(**kwargs: Any) -> "Log":
         log = Log()
         for key in kwargs.keys():
             if hasattr(log, key):
