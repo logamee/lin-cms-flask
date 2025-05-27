@@ -6,7 +6,7 @@ Redprint make blueprint more fine-grained
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 class Redprint:
@@ -36,7 +36,7 @@ class Redprint:
 
         return decorator
 
-    def register(self, bp: Any, url_prefix: str = None) -> None:
+    def register(self, bp: Any, url_prefix: Optional[str] = None) -> None:
         """
         注册路由到蓝图
 

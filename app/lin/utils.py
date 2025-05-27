@@ -85,8 +85,9 @@ def import_module_abs(name: str, path: str) -> None:
     :param path: 模块的绝对路径。
     """
     spec = importlib.util.spec_from_file_location(name, path)
-    foo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(foo)
+    if spec is not None and spec.loader is not None:
+        foo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(foo)
 
 
 def get_pwd() -> str:
@@ -122,7 +123,7 @@ def get_random_str(length: int) -> str:
     return "".join(sa)
 
 
-Meta = namedtuple("meta", ["name", "module", "mount"])
+Meta = namedtuple("Meta", ["name", "module", "mount"])
 
 permission_meta_infos: Dict[str, Meta] = {}
 
@@ -139,7 +140,8 @@ def permission_meta(name: str, module: str = "common", mount: bool = True):
 
     def wrapper(func: Callable[..., Any]) -> Callable[..., Any]:
         func_name = func.__name__ + str(func.__hash__())
-        existed = permission_meta_infos.get(func_name, None) and permission_meta_infos.get(func_name).module == module
+        existed_meta = permission_meta_infos.get(func_name, None)
+        existed = existed_meta is not None and existed_meta.module == module
         if existed:
             raise Exception("函数名在同一模块中不能重复")
         else:

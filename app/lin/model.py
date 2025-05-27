@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from flask import current_app
 from sqlalchemy import func
@@ -20,7 +21,7 @@ from .interface import (
 
 class Group(GroupInterface):
     @classmethod
-    def count_by_id(cls, id) -> int:
+    def count_by_id(cls, id: int) -> int:
         result = db.session.query(func.count(cls.id)).filter(cls.id == id, cls.is_deleted == False)
         count = result.scalar()
         return count
@@ -31,10 +32,12 @@ class GroupPermission(GroupPermissionInterface):
 
 
 class Permission(PermissionInterface):
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name + self.module)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Permission):
+            return NotImplemented
         if self.name == other.name and self.module == other.module:
             # 如果出现了复用同名权限，则要保证mount=True的权限生效
             self.mount = self.mount or other.mount
@@ -45,7 +48,7 @@ class Permission(PermissionInterface):
 
 class User(UserInterface):
     @property
-    def avatar(self):
+    def avatar(self) -> Optional[str]:
         site_domain = current_app.config.get(
             "SITE_DOMAIN",
             "http://{host}:{port}".format(
@@ -55,10 +58,11 @@ class User(UserInterface):
         )
 
         if self._avatar is not None:
-            return site_domain + os.path.join(current_app.static_url_path, self._avatar)
+            return site_domain + os.path.join(current_app.static_url_path or "", self._avatar)
+        return None
 
     @classmethod
-    def count_by_id(cls, uid) -> int:
+    def count_by_id(cls, uid: int) -> int:
         result = db.session.query(func.count(cls.id)).filter(cls.id == uid, cls.is_deleted == False)
         count = result.scalar()
         return count
@@ -84,28 +88,47 @@ class User(UserInterface):
         return True
 
     @property
-    def password(self):
-        return manager.identity_model.get(user_id=self.id).credential
-
-    @password.setter
-    def password(self, raw):
+    def password(self) -> str:
         user_identity = manager.identity_model.get(user_id=self.id)
         if user_identity:
-            user_identity.credential = generate_password_hash(raw)
-            user_identity.update(synchronize_session=False)
-        else:
-            user_identity = manager.identity_model()
-            user_identity.user_id = self.id
-            user_identity.identity_type = "USERNAME_PASSWORD"
-            user_identity.identity = "root"
-            user_identity.credential = generate_password_hash(raw)
-            db.session.add(user_identity)
+            return user_identity.credential
+        return ""  # 如果没有认证记录，返回空字符串
 
-    def check_password(self, raw):
+    @password.setter
+    def password(self, raw: str) -> None:
+        # 验证密码输入
+        if not raw or len(raw.strip()) == 0:
+            raise ParameterError("密码不能为空")
+        if len(raw) < 6:
+            raise ParameterError("密码长度不能少于6位")
+
+        try:
+            # 查找用户的身份认证记录
+            user_identity = manager.identity_model.get(user_id=self.id)
+
+            if user_identity:
+                # 更新现有的认证记录
+                user_identity.credential = generate_password_hash(raw)
+                user_identity.update(synchronize_session=False)
+
+            else:
+                # 创建新的认证记录
+                user_identity = manager.identity_model()
+                user_identity.user_id = self.id
+                user_identity.identity_type = "USERNAME_PASSWORD"  # 默认类型，可根据需要调整
+                user_identity.identifier = self.username  # 使用用户的实际用户名
+                user_identity.credential = generate_password_hash(raw)
+                db.session.add(user_identity)
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            raise ParameterError(f"密码设置失败: {str(e)}")
+
+    def check_password(self, raw: str) -> bool:
         return check_password_hash(self.password, raw)
 
     @classmethod
-    def verify(cls, username, password):
+    def verify(cls, username: str, password: str) -> "User":
         user = cls.query.filter_by(username=username).first()
         if user is None or user.is_deleted:
             raise NotFound("用户不存在")
