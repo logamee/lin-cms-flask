@@ -9,7 +9,7 @@ jwt implement for Lin.
 """
 
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union
 
 from flask import request
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, get_current_user
@@ -22,7 +22,7 @@ __all__ = ["login_required", "admin_required", "group_required"]
 
 SCOPE = "lin"
 jwt = JWTManager()
-identity = dict(uid=0, scope=SCOPE)
+identity: Dict[str, Union[int, str]] = dict(uid=0, scope=SCOPE)
 
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -77,10 +77,22 @@ def login_required(fn: F) -> F:
 
 
 @jwt.user_lookup_loader
-def user_loader_callback(t, identity):
+def user_loader_callback(jwt_header: Any, jwt_payload: Dict[str, Any]) -> Any:
+    import json
+
+    # 从JWT payload中获取identity并解析
+    identity_str = jwt_payload.get("sub")
+    if not identity_str:
+        raise UnAuthentication()  # type: ignore
+
+    try:
+        identity = json.loads(identity_str)
+    except (json.JSONDecodeError, TypeError):
+        raise UnAuthentication()  # type: ignore
+
     if identity["scope"] != SCOPE:
         raise UnAuthentication()  # type: ignore
-    if identity["remote_addr"] and identity["remote_addr"] != request.remote_addr:
+    if identity.get("remote_addr") and identity["remote_addr"] != request.remote_addr:
         raise UnAuthentication()  # type: ignore
     # token is granted , user must be exit
     # 如果token已经被颁发，则该用户一定存在
@@ -90,23 +102,31 @@ def user_loader_callback(t, identity):
     return user
 
 
+@jwt.user_identity_loader
+def user_identity_callback(identity: Dict[str, Union[int, str]]) -> str:
+    """将identity字典转换为字符串作为JWT的subject"""
+    import json
+
+    return json.dumps(identity)
+
+
 @jwt.expired_token_loader
-def expired_loader_callback(t, identity):
+def expired_loader_callback(t: Any, identity: Dict[str, Any]) -> TokenExpired:
     return TokenExpired(10051)  # type: ignore
 
 
 @jwt.invalid_token_loader
-def invalid_loader_callback(e):
+def invalid_loader_callback(e: str) -> TokenInvalid:
     return TokenInvalid(10041)  # type: ignore
 
 
 @jwt.unauthorized_loader
-def unauthorized_loader_callback(e):
+def unauthorized_loader_callback(e: str) -> UnAuthentication:
     return UnAuthentication("认证失败，请检查请求头或者重新登录")  # type: ignore
 
 
 @jwt.additional_claims_loader
-def add_claims_to_access_token(identity):
+def add_claims_to_access_token(identity: Dict[str, Union[int, str]]) -> Dict[str, Any]:
     return {
         "uid": identity["uid"],
         "scope": identity["scope"],
@@ -114,15 +134,15 @@ def add_claims_to_access_token(identity):
     }
 
 
-def verify_access_token():
+def verify_access_token() -> None:
     __verify_token("access")
 
 
-def verify_refresh_token():
+def verify_refresh_token() -> None:
     __verify_token("refresh")
 
 
-def __verify_token(request_type):
+def __verify_token(request_type: str) -> None:
     1 / 0
     from flask import request
     from flask_jwt_extended.config import config
@@ -140,12 +160,12 @@ def __verify_token(request_type):
         verify_token_claims(jwt_data)
 
 
-def _check_is_active(current_user):
+def _check_is_active(current_user: Any) -> None:
     if not current_user.is_active:
         raise UnAuthentication("您目前处于未激活状态，请联系超级管理员")
 
 
-def get_tokens(user, verify_remote_addr=False):
+def get_tokens(user: Any, verify_remote_addr: bool = False) -> Tuple[str, str]:
     identity["uid"] = user.id
     if verify_remote_addr:
         identity["remote_addr"] = request.remote_addr

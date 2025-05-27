@@ -9,7 +9,7 @@ import os
 from collections import OrderedDict
 from contextlib import contextmanager
 from inspect import isclass
-from typing import Any, Iterator
+from typing import Any, Iterator, List, Optional, Union
 
 import tablib
 from flask import json
@@ -32,8 +32,8 @@ Base = declarative_base()
 class MixinJSONSerializer:
 
     @declared_attr.directive
-    def __tablename__(cls) -> str | None:
-        name: str | None = None
+    def __tablename__(cls) -> Optional[str]:
+        name: Optional[str] = None
         if not has_inherited_table(cls):
             name = camel2line(cls.__name__)
         return name
@@ -163,9 +163,9 @@ class Record(object):
 class RecordCollection:
     """查询结果记录集合"""
 
-    def __init__(self, rows: Iterator[Record] | list[Record]) -> None:
+    def __init__(self, rows: Union[Iterator[Record], List[Record]]) -> None:
         self._rows = rows
-        self._all_rows: list[Record] = []
+        self._all_rows: List[Record] = []
         self.pending: bool = True
 
     def __repr__(self):
@@ -248,7 +248,7 @@ class RecordCollection:
 
         return data
 
-    def all(self, as_dict: bool = False, as_ordereddict: bool = False) -> list[Record] | list[dict]:
+    def all(self, as_dict: bool = False, as_ordereddict: bool = False) -> Union[List[Record], List[dict]]:
         """获取全部结果记录"""
 
         # By calling list it calls the __iter__ method

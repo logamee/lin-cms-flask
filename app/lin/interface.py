@@ -9,7 +9,16 @@ interface means you must implement the necessary methods and inherit properties.
 :license: MIT, see LICENSE for more details.
 """
 from datetime import datetime
-from typing import Any, List, Optional, Self, Union
+from typing import Any, Dict, List, Optional, TypeVar, Union
+
+try:
+    from typing import Self  # Python 3.11+
+except ImportError:
+    try:
+        from typing_extensions import Self  # 兼容性包
+    except ImportError:
+        # 后备方案：使用TypeVar
+        Self = TypeVar("Self")  # type: ignore
 
 from sqlalchemy import Boolean, Column, DateTime, Index, Integer, SmallInteger, String, func, text
 
@@ -22,21 +31,21 @@ from .utils import camel2line
 class BaseCrud(db.Model, MixinJSONSerializer):
     __abstract__ = True
 
-    def __init__(self):
+    def __init__(self) -> None:
         name: str = self.__class__.__name__
         if not hasattr(self, "__tablename__"):
             self.__tablename__ = camel2line(name)
 
-    def _set_fields(self):
+    def _set_fields(self) -> None:
         self._exclude = []
 
-    def set_attrs(self, attrs_dict):
+    def set_attrs(self, attrs_dict: Dict[str, Any]) -> None:
         for key, value in attrs_dict.items():
             if hasattr(self, key) and key != "id":
                 setattr(self, key, value)
 
     # 硬删除
-    def delete(self, commit=False):
+    def delete(self, commit: bool = False) -> None:
         db.session.delete(self)
         if commit:
             db.session.commit()
@@ -44,7 +53,7 @@ class BaseCrud(db.Model, MixinJSONSerializer):
     # 查
     @classmethod
     def get(
-        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any
     ) -> Union[Optional[Self], List[Self]]:
         if one:
             return cls.query.filter().filter_by(**kwargs).first()
@@ -62,7 +71,7 @@ class BaseCrud(db.Model, MixinJSONSerializer):
             db.session.commit()
         return one
 
-    def update(self, commit: bool = False) -> Self:
+    def update(self, commit: bool = False, **kwargs: Any) -> Self:
         for key in kwargs.keys():
             if hasattr(self, key):
                 setattr(self, key, kwargs[key])
@@ -82,16 +91,16 @@ class InfoCrud(db.Model, MixinJSONSerializer):
     delete_time = Column(DateTime(timezone=True))
     is_deleted = Column(Boolean, nullable=False, default=False)
 
-    def _set_fields(self):
+    def _set_fields(self) -> None:
         self._exclude = ["delete_time", "is_deleted"]
 
-    def set_attrs(self, attrs_dict):
+    def set_attrs(self, attrs_dict: Dict[str, Any]) -> None:
         for key, value in attrs_dict.items():
             if hasattr(self, key) and key != "id":
                 setattr(self, key, value)
 
     # 软删除
-    def delete(self, commit=False):
+    def delete(self, commit: bool = False) -> None:
         self.delete_time = datetime.now()
         self.is_deleted = True
         db.session.add(self)
@@ -100,14 +109,16 @@ class InfoCrud(db.Model, MixinJSONSerializer):
             db.session.commit()
 
     # 硬删除
-    def hard_delete(self, commit=False):
+    def hard_delete(self, commit: bool = False) -> None:
         db.session.delete(self)
         if commit:
             db.session.commit()
 
     # 查
     @classmethod
-    def get(cls, start=None, count=None, one=True, **kwargs):
+    def get(
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any
+    ) -> Union[Optional[Self], List[Self]]:
         # 应用软删除，必须带有delete_time
         if kwargs.get("is_deleted") is None:
             kwargs["is_deleted"] = False
@@ -117,7 +128,7 @@ class InfoCrud(db.Model, MixinJSONSerializer):
 
     # 增
     @classmethod
-    def create(cls, **kwargs):
+    def create(cls, **kwargs: Any) -> Self:
         one = cls()
         for key in kwargs.keys():
             # if key == 'from':
@@ -131,7 +142,7 @@ class InfoCrud(db.Model, MixinJSONSerializer):
             db.session.commit()
         return one
 
-    def update(self, **kwargs):
+    def update(self, **kwargs: Any) -> Self:
         for key in kwargs.keys():
             # if key == 'from':
             #     setattr(self, '_from', kwargs[key])
@@ -158,7 +169,7 @@ class GroupInterface(InfoCrud):
     )
 
     @classmethod
-    def count_by_id(cls, id) -> int:
+    def count_by_id(cls, id: int) -> int:
         raise NotImplementedError()
 
 
@@ -180,11 +191,13 @@ class PermissionInterface(InfoCrud):
     module = Column(String(50), nullable=False, comment="权限所属模块，例如：人员管理")
     mount = Column(Boolean, nullable=False, comment="是否为挂载权限")
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         raise NotImplementedError()
 
-    def __eq__(self, other):
-        raise NotImplementedError()
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PermissionInterface):
+            return NotImplemented
+        return True  # 具体的比较逻辑由子类实现
 
 
 class UserInterface(InfoCrud):
@@ -201,15 +214,15 @@ class UserInterface(InfoCrud):
     email = Column(String(100), comment="邮箱")
 
     @property
-    def avatar(self) -> str:
+    def avatar(self) -> Optional[str]:
         raise NotImplementedError()
 
     @classmethod
-    def count_by_id(cls, uid) -> int:
+    def count_by_id(cls, uid: int) -> int:
         raise NotImplementedError()
 
     @staticmethod
-    def count_by_id_and_group_name(user_id, group_name) -> int:
+    def count_by_id_and_group_name(user_id: int, group_name: str) -> int:
         raise NotImplementedError()
 
     @property
@@ -225,14 +238,14 @@ class UserInterface(InfoCrud):
         raise NotImplementedError()
 
     @password.setter
-    def password(self, raw) -> None:
+    def password(self, raw: str) -> None:
         raise NotImplementedError()
 
-    def check_password(self, raw):
+    def check_password(self, raw: str) -> bool:
         raise NotImplementedError()
 
     @classmethod
-    def verify(cls, username, password) -> InfoCrud:
+    def verify(cls, username: str, password: str) -> "UserInterface":
         raise NotImplementedError()
 
 
@@ -256,9 +269,11 @@ class UserIdentityInterface(InfoCrud):
 
 
 class LinViewModel:
-    # 提供自动序列化功能
-    def keys(self):
-        return self.__dict__.keys()
+    def __init__(self, attrs: List[str], **kwargs: Any) -> None:
+        self._attrs = attrs
 
-    def __getitem__(self, key):
+    def keys(self) -> List[str]:
+        return self._attrs
+
+    def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
