@@ -14,3 +14,15 @@ def test_change_nickname(fixtureFunc):
             json={"nickname": "tester"},
         )
         assert rv.status_code == 200
+
+
+def test_refresh_token(fixtureFunc):
+    with app.test_client() as c:
+        rv = c.get(
+            "/cms/user/refresh",
+            headers={"Authorization": "Bearer " + get_token('refresh_token')},
+        )
+        json_data = rv.get_json()
+        assert rv.status_code == 200
+        assert json_data.get("access_token") is not None
+        assert json_data.get("refresh_token") is not None

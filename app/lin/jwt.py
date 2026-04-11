@@ -8,6 +8,7 @@ jwt implement for Lin.
 :license: MIT, see LICENSE for more details.
 """
 
+import json
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union
 
@@ -22,10 +23,23 @@ __all__ = ["login_required", "admin_required", "group_required"]
 
 SCOPE = "lin"
 jwt = JWTManager()
-identity: Dict[str, Union[int, str]] = dict(uid=0, scope=SCOPE)
 
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _normalize_identity(raw_identity: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    identity = raw_identity
+    for _ in range(2):
+        if isinstance(identity, str):
+            try:
+                identity = json.loads(identity)
+            except (json.JSONDecodeError, TypeError):
+                raise UnAuthentication()  # type: ignore
+
+    if not isinstance(identity, dict):
+        raise UnAuthentication()  # type: ignore
+    return identity
 
 
 def admin_required(fn: F) -> F:
@@ -78,18 +92,11 @@ def login_required(fn: F) -> F:
 
 @jwt.user_lookup_loader
 def user_loader_callback(jwt_header: Any, jwt_payload: Dict[str, Any]) -> Any:
-    import json
-
-    # 从JWT payload中获取identity并解析
-    identity_str = jwt_payload.get("sub")
-    if not identity_str:
+    raw_identity = jwt_payload.get("sub")
+    if not raw_identity:
         raise UnAuthentication()  # type: ignore
 
-    try:
-        identity = json.loads(identity_str)
-    except (json.JSONDecodeError, TypeError):
-        raise UnAuthentication()  # type: ignore
-
+    identity = _normalize_identity(raw_identity)
     if identity["scope"] != SCOPE:
         raise UnAuthentication()  # type: ignore
     if identity.get("remote_addr") and identity["remote_addr"] != request.remote_addr:
@@ -103,11 +110,9 @@ def user_loader_callback(jwt_header: Any, jwt_payload: Dict[str, Any]) -> Any:
 
 
 @jwt.user_identity_loader
-def user_identity_callback(identity: Dict[str, Union[int, str]]) -> str:
+def user_identity_callback(identity: Union[str, Dict[str, Any]]) -> str:
     """将identity字典转换为字符串作为JWT的subject"""
-    import json
-
-    return json.dumps(identity)
+    return json.dumps(_normalize_identity(identity))
 
 
 @jwt.expired_token_loader
@@ -126,11 +131,12 @@ def unauthorized_loader_callback(e: str) -> UnAuthentication:
 
 
 @jwt.additional_claims_loader
-def add_claims_to_access_token(identity: Dict[str, Union[int, str]]) -> Dict[str, Any]:
+def add_claims_to_access_token(identity: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    identity_data = _normalize_identity(identity)
     return {
-        "uid": identity["uid"],
-        "scope": identity["scope"],
-        "remote_addr": identity["remote_addr"] if "remote_addr" in identity.keys() else None,
+        "uid": identity_data["uid"],
+        "scope": identity_data["scope"],
+        "remote_addr": identity_data["remote_addr"] if "remote_addr" in identity_data.keys() else None,
     }
 
 
@@ -166,7 +172,7 @@ def _check_is_active(current_user: Any) -> None:
 
 
 def get_tokens(user: Any, verify_remote_addr: bool = False) -> Tuple[str, str]:
-    identity["uid"] = user.id
+    identity: Dict[str, Union[int, Optional[str]]] = {"uid": user.id, "scope": SCOPE}
     if verify_remote_addr:
         identity["remote_addr"] = request.remote_addr
     access_token = create_access_token(identity)
