@@ -1,6 +1,5 @@
 from typing import Any, List
 
-from flask import g
 from pydantic import Field
 
 from app.lin import BaseModel
@@ -20,6 +19,6 @@ class QueryPageSchema(BaseModel):
     count: int = Field(5, gt=0, lt=16, description="0 < count < 16")
     page: int = 0
 
-    @staticmethod
-    def offset_handler(req, resp, req_validation_error, instance):
-        g.offset = req.context.query.count * req.context.query.page
+    @property
+    def offset(self) -> int:
+        return self.count * self.page

@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from pydantic import RootModel
+
 from app.lin import BaseModel
 
 
@@ -22,5 +24,5 @@ class BookOutSchema(BaseModel):
     summary: str
 
 
-class BookSchemaList(BaseModel):
-    __root__: List[BookOutSchema]
+class BookSchemaList(RootModel[List[BookOutSchema]]):
+    pass

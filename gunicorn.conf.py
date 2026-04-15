@@ -6,7 +6,7 @@ monkey.patch_all()
 
 
 bind = "0.0.0.0:5000"
-worker_class = "geventwebsocket.gunicorn.workers.GeventWebSocketWorker"
+worker_class = "gevent"
 daemon = False
 workers = multiprocessing.cpu_count() * 2 + 1
 debug = False

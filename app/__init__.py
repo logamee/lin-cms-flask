@@ -38,12 +38,6 @@ def apply_cors(app):
     CORS(app)
 
 
-def init_socketio(app):
-    from app.extension.notify.socketio import socketio
-
-    socketio.init_app(app, cors_allowed_origins="*")
-
-
 def load_app_config(app):
     """
     根据指定配置环境自动加载对应环境变量和配置类到app config
@@ -84,7 +78,6 @@ def create_app(register_all=True, **kwargs):
         register_blueprints(app)
         register_api(app)
         apply_cors(app)
-        init_socketio(app)
         Lin(app, **kwargs)
         register_cli(app)
     return app

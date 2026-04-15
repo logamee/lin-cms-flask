@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional
 
-from pydantic import Field, validator
+from pydantic import Field, ValidationInfo, field_validator
 
 from app.lin import BaseModel, ParameterError
 
@@ -11,7 +11,7 @@ from . import EmailSchema, GroupIdListSchema, ResetPasswordSchema
 class LoginSchema(BaseModel):
     username: str = Field(description="用户名")
     password: str = Field(description="密码")
-    captcha: Optional[str] = Field(description="验证码")
+    captcha: Optional[str] = Field(None, description="验证码")
 
 
 class LoginTokenSchema(BaseModel):
@@ -33,8 +33,8 @@ class PermissionModuleSchema(BaseModel):
 
 
 class UserBaseInfoSchema(EmailSchema):
-    nickname: Optional[str] = Field(description="用户昵称", min_length=2, max_length=10)
-    avatar: Optional[str] = Field(description="头像url")
+    nickname: Optional[str] = Field(None, description="用户昵称", min_length=2, max_length=10)
+    avatar: Optional[str] = Field(None, description="头像url")
 
 
 class UserSchema(UserBaseInfoSchema):
@@ -56,14 +56,16 @@ class UserRegisterSchema(GroupIdListSchema, EmailSchema):
     password: str = Field(description="密码", min_length=6, max_length=22)
     confirm_password: str = Field(description="确认密码", min_length=6, max_length=22)
 
-    @validator("confirm_password")
-    def passwords_match(cls, v, values, **kwargs):
-        if v != values["password"]:
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, value: str, info: ValidationInfo) -> str:
+        if value != info.data["password"]:
             raise ParameterError("两次输入的密码不一致，请输入相同的密码")
-        return v
+        return value
 
-    @validator("username")
-    def check_username(cls, v, values, **kwargs):
-        if not re.match(r"^[a-zA-Z0-9_]{2,10}$", v):
+    @field_validator("username")
+    @classmethod
+    def check_username(cls, value: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_]{2,10}$", value):
             raise ParameterError("用户名只能由字母、数字、下划线组成，且长度为2-10位")
-        return v
+        return value

@@ -7,7 +7,7 @@ admin apis
 
 import math
 
-from flask import Blueprint, g
+from flask import Blueprint
 from sqlalchemy import func
 
 from app.api import AuthorizationBearerSecurity, api
@@ -61,7 +61,6 @@ def permissions():
     tags=["管理员"],
     security=[AuthorizationBearerSecurity],
     resp=DocResponse(r=AdminUserPageSchema),
-    before=QueryPageWithGroupIdSchema.offset_handler,
 )
 def get_admin_users(query: QueryPageWithGroupIdSchema):
     """
@@ -71,8 +70,8 @@ def get_admin_users(query: QueryPageWithGroupIdSchema):
     query_group_id = db.session.query(manager.group_model.id).filter(
         manager.group_model.level != GroupLevelEnum.ROOT.value
     )
-    if g.group_id:
-        query_group_id = query_group_id.filter(manager.group_model.id == g.group_id)
+    if query.group_id:
+        query_group_id = query_group_id.filter(manager.group_model.id == query.group_id)
     # 获取符合条件的用户总量
     total = (
         db.session.query(func.count(func.distinct(manager.user_group_model.user_id)))
@@ -84,8 +83,8 @@ def get_admin_users(query: QueryPageWithGroupIdSchema):
         db.session.query(manager.user_group_model.user_id)
         .filter(manager.user_group_model.group_id.in_(query_group_id))
         .group_by(manager.user_group_model.user_id)
-        .offset(g.offset)
-        .limit(g.count)
+        .offset(query.offset)
+        .limit(query.count)
     )
     # 部分数据库不支持子语句 in limit
     current_page_user_ids = [user_id[0] for user_id in query_current_page_user_ids.all()]
@@ -120,10 +119,10 @@ def get_admin_users(query: QueryPageWithGroupIdSchema):
 
     return {
         "items": items,
-        "count": g.count,
-        "page": g.page,
+        "count": query.count,
+        "page": query.page,
         "total": total,
-        "total_page": math.ceil(total / g.count),
+        "total_page": math.ceil(total / query.count),
     }
 
 
@@ -145,7 +144,7 @@ def change_user_password(uid: int, json: ResetPasswordSchema):
         raise NotFound("用户不存在")
 
     with db.auto_commit():
-        user.reset_password(g.new_password)
+        user.reset_password(json.new_password)
 
     raise Success("密码修改成功")
 
@@ -195,13 +194,13 @@ def update_user(uid: int, json: UpdateUserInfoSchema):
     user = manager.user_model.get(id=uid)
     if user is None:
         raise NotFound("用户不存在")
-    if user.email != g.email:
-        exists = manager.user_model.get(email=g.email)
+    if user.email != json.email:
+        exists = manager.user_model.get(email=json.email)
         if exists:
             raise ParameterError("邮箱已被注册，请重新输入邮箱")
     with db.auto_commit():
-        user.email = g.email
-        group_ids = g.group_ids
+        user.email = json.email
+        group_ids = json.group_ids
         # 清空原来的所有关联关系
         manager.user_group_model.query.filter_by(user_id=user.id).delete(synchronize_session=False)
         # 根据传入分组ids 新增关联记录
@@ -276,17 +275,17 @@ def create_group(json: CreateGroupSchema):
     """
     新建分组
     """
-    exists = manager.group_model.get(name=g.name)
+    exists = manager.group_model.get(name=json.name)
     if exists:
         raise Forbidden("分组已存在，不可创建同名分组")
     with db.auto_commit():
         group = manager.group_model.create(
-            name=g.name,
-            info=g.info,
+            name=json.name,
+            info=json.info,
         )
         db.session.flush()
         group_permission_list = list()
-        for permission_id in g.permission_ids:
+        for permission_id in json.permission_ids:
             gp = manager.group_permission_model()
             gp.group_id = group.id
             gp.permission_id = permission_id
@@ -313,7 +312,7 @@ def update_group(gid, json: GroupBaseSchema):
     exists = manager.group_model.get(id=gid)
     if not exists:
         raise NotFound("分组不存在，更新失败")
-    exists.update(name=g.name, info=g.info, commit=True)
+    exists.update(name=json.name, info=json.info, commit=True)
     raise Success("更新成功")
 
 
@@ -362,11 +361,11 @@ def dispatch_auths(json: GroupIdWithPermissionIdListSchema):
     分配多个权限
     """
     with db.auto_commit():
-        for permission_id in g.permission_ids:
-            one = manager.group_permission_model.get(group_id=g.group_id, permission_id=permission_id)
+        for permission_id in json.permission_ids:
+            one = manager.group_permission_model.get(group_id=json.group_id, permission_id=permission_id)
             if not one:
                 manager.group_permission_model.create(
-                    group_id=g.group_id,
+                    group_id=json.group_id,
                     permission_id=permission_id,
                 )
     raise Success("添加权限成功")
@@ -387,8 +386,8 @@ def remove_auths(json: GroupIdWithPermissionIdListSchema):
 
     with db.auto_commit():
         db.session.query(manager.group_permission_model).filter(
-            manager.group_permission_model.permission_id.in_(g.permission_ids),
-            manager.group_permission_model.group_id == g.group_id,
+            manager.group_permission_model.permission_id.in_(json.permission_ids),
+            manager.group_permission_model.group_id == json.group_id,
         ).delete(synchronize_session=False)
 
     raise Success("删除权限成功")

@@ -1,5 +1,7 @@
 from typing import List
 
+from pydantic import RootModel
+
 from app.lin import BaseModel
 
 
@@ -10,5 +12,5 @@ class CosOutSchema(BaseModel):
     url: str
 
 
-class CosOutSchemaList(BaseModel):
-    __root__: List[CosOutSchema]
+class CosOutSchemaList(RootModel[List[CosOutSchema]]):
+    pass

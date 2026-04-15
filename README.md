@@ -10,10 +10,10 @@
 <h4 align="center">一个简单易用的CMS后端项目 | <a href="https://doc.cms.talelin.com/" target="_blank">Lin-CMS-Flask</a></h4>
 
 <p align="center">
-  <a href="http://Flask.pocoo.org/docs/3.0/" rel="nofollow">
-  <img src="https://img.shields.io/badge/Flask-3.1.0-green.svg" alt="Flask version" data-canonical-src="https://img.shields.io/badge/Flask-3.1.0-green.svg" style="max-width:100%;"></a>
+  <a href="https://flask.palletsprojects.com/en/3.1.x/" rel="nofollow">
+  <img src="https://img.shields.io/badge/Flask-3.1.3-green.svg" alt="Flask version" data-canonical-src="https://img.shields.io/badge/Flask-3.1.3-green.svg" style="max-width:100%;"></a>
     <a href="https://www.python.org/" rel="nofollow">
-    <img src="https://img.shields.io/badge/python->=3.9,<3.14-red.svg" alt="Python version" data-canonical-src="https://img.shields.io/badge/python->=3.9,<3.14-red.svg" style="max-width:100%;">
+    <img src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" alt="Python version" data-canonical-src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" style="max-width:100%;">
     </a>
       <a href="https://doc.cms.talelin.com/" rel="nofollow"><img src="https://img.shields.io/badge/license-MIT-skyblue.svg" alt="LISENCE" data-canonical-src="https://img.shields.io/badge/license-MIT-skyblue.svg" style="max-width:100%;"></a>
 </p>

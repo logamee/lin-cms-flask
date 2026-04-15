@@ -1,18 +1,15 @@
-import typing as t
+import hashlib
 from functools import wraps
+from json import dumps
 from typing import *
 
-from flask import Flask, current_app, g, json, jsonify, make_response
 from pydantic import BaseModel as _BaseModel
-from pydantic import validate_model
-from pydantic.main import object_setattr
+from pydantic import ConfigDict
 from spectree import SpecTree as _SpecTree
 from spectree._types import ModelType
 from spectree.response import DEFAULT_CODE_DESC, Response
 
 from .db import Record, RecordCollection
-from .exception import ParameterError
-from .utils import camel2line
 
 
 class ValidationError(_BaseModel):
@@ -21,70 +18,13 @@ class ValidationError(_BaseModel):
 
 
 class BaseModel(_BaseModel):
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
-    # Uses something other than `self` the first arg to allow "self" as a settable attribute
-    def __init__(__pydantic_self__, **data: t.Any) -> None:  # type: ignore
-        values, fields_set, validation_error = validate_model(__pydantic_self__.__class__, data)
-        if validation_error:
-            raise ParameterError(" and ".join([f'{i["loc"][0]} {i["msg"]}' for i in validation_error.errors()]))
-        try:
-            object_setattr(__pydantic_self__, "__dict__", values)
-        except TypeError as e:
-            raise TypeError(
-                "Model values must be a dict; you may not have returned a dictionary from a root validator"
-            ) from e
-        object_setattr(__pydantic_self__, "__fields_set__", fields_set)
-        __pydantic_self__._init_private_attributes()
 
-    """
-    Workaround for serializing properties with pydantic until
-    https://github.com/samuelcolvin/pydantic/issues/935
-    is solved
-    """
-
-    @classmethod
-    def get_properties(cls):
-        return [
-            prop
-            for prop in dir(cls)
-            if isinstance(getattr(cls, prop), property) and prop not in ("__values__", "fields")
-        ]
-
-    def dict(
-        self,
-        *,
-        include=None,
-        exclude=None,
-        by_alias: bool = False,
-        skip_defaults: bool = None,
-        exclude_unset: bool = False,
-        exclude_defaults: bool = False,
-        exclude_none: bool = False,
-    ):
-        attribs = super().dict(
-            include=include,
-            exclude=exclude,
-            by_alias=by_alias,
-            skip_defaults=skip_defaults,
-            exclude_unset=exclude_unset,
-            exclude_defaults=exclude_defaults,
-            exclude_none=exclude_none,
-        )
-        props = self.get_properties()
-        # Include and exclude properties
-        if include:
-            props = [prop for prop in props if prop in include]
-        if exclude:
-            props = [prop for prop in props if prop not in exclude]
-
-        # Update the attribute dict with the properties
-        if props:
-            attribs.update({prop: getattr(self, prop) for prop in props})
-
-        return attribs
-
+class ApiMessageSchema(BaseModel):
+    code: int
+    message: Any
+    request: str
 
 class SpecTree(_SpecTree):
     def validate(  # noqa: PLR0913  [too-many-arguments]
@@ -104,6 +44,7 @@ class SpecTree(_SpecTree):
         path_parameter_descriptions: Optional[Mapping[str, str]] = None,
         skip_validation: bool = False,
         operation_id: Optional[str] = None,
+        force_resp_serialize: bool = True,
     ) -> Callable:
         """
         - validate query, json, headers in request
@@ -134,26 +75,9 @@ class SpecTree(_SpecTree):
         if not validation_error_status:
             validation_error_status = self.validation_error_status
 
-        resp_schema = resp.r if resp else None
-
         def lin_before(req, resp, req_validation_error, instance):
-            g._resp_schema = resp_schema
             if before:
                 before(req, resp, req_validation_error, instance)
-            schemas = ["headers", "cookies", "query", "json"]
-            for schema in schemas:
-                params = getattr(req.context, schema)
-                if params:
-                    for k, v in params:
-                        # 检测参数命名是否存在冲突，冲突则抛出要求重新命名的ParameterError
-                        if hasattr(g, k) or hasattr(g, camel2line(k)):
-                            raise ParameterError(
-                                {k: f"This parameter in { schema.capitalize() } needs to be renamed"}
-                            )  # type: ignore
-                        # 将参数设置到g中，以便后续使用
-                        setattr(g, k, v)
-                        # 将参数设置到g中，同时将参数名转换为下划线格式
-                        setattr(g, camel2line(k), v)
 
         def lin_after(req, resp, resp_validation_error, instance):
             # global after handler here
@@ -177,6 +101,7 @@ class SpecTree(_SpecTree):
                     lin_after,
                     validation_error_status,
                     skip_validation,
+                    force_resp_serialize,
                     *args,
                     **kwargs,
                 )
@@ -228,18 +153,21 @@ class SpecTree(_SpecTree):
         return decorate_validation
 
 
-def schema_response(app: Flask):
-    """
-    根据apidoc中指定的r schema，重新生成对应类型的响应
-    """
+def _json_default(value: Any) -> Any:
+    if isinstance(value, _BaseModel):
+        return value.model_dump()
+    if isinstance(value, (RecordCollection, Record)):
+        return value.as_dict()
+    if isinstance(value, (set, tuple)):
+        return list(value)
+    if hasattr(value, "keys") and hasattr(value, "__getitem__"):
+        return dict(value)
+    return str(value)
 
-    @app.after_request
-    def make_schema_response(response):
-        res = response
-        if hasattr(g, "_resp_schema") and g._resp_schema and response.status_code == 200:
-            data, _code, _headers = response.get_json()
-            res = make_response(jsonify(g._resp_schema.parse_obj(data)))
-        return res
+
+def _fingerprint(value: Any) -> str:
+    payload = dumps(value, default=_json_default, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
 
 
 class DocResponse(Response):
@@ -263,30 +191,20 @@ class DocResponse(Response):
         # 将 args 转换后存入code_models
         for arg in args:
             assert "HTTP_" + str(arg.code) in DEFAULT_CODE_DESC, "invalid HTTP status code"
-            name = arg.__class__.__name__
-            schema_name = "{class_name}_{message_code}_{hashmsg}Schema".format(
-                class_name=name,
-                message_code=arg.message_code,
-                hashmsg=hash(arg.message),
-            )
-            # 通过 name, schema_name, arg(包含code:int, 和message:str 两个属性) 生成一个新的BaseModel子类, 并存入code_models
-            self.code_models["HTTP_" + str(arg.code)] = type(
-                schema_name,
-                (BaseModel,),
-                {"__annotations__": {"code": int, "message": str}, "code": arg.message_code, "message": arg.message},
-            )
+            http_status = "HTTP_" + str(arg.code)
+            self.code_models[http_status] = ApiMessageSchema
+            if isinstance(arg.message, str):
+                self.code_descriptions[http_status] = arg.message
         # 将 r 转换后存入code_models
         if r:
             http_status = "HTTP_200"
-            if r.__class__.__name__ == "ModelMetaclass":
+            if isinstance(r, type) and issubclass(r, _BaseModel):
                 self.code_models[http_status] = r
             elif isinstance(r, dict):
-                response_str = json.dumps(r, cls=current_app.json_encoder)
-                r = type("Dict-{}Schema".format(hash(response_str)), (BaseModel,), r)
+                r = type(f"Dict_{_fingerprint(r)}Schema", (BaseModel,), r)
                 self.code_models[http_status] = r
             elif isinstance(r, (RecordCollection, Record)) or (hasattr(r, "keys") and hasattr(r, "__getitem__")):
-                r_str = json.dumps(r, cls=current_app.json_encoder)
-                r = json.loads(r_str)
-                r = type("Json{}Schema".format(hash(r_str)), (BaseModel,), r)
+                payload = _json_default(r)
+                r = type(f"Json_{_fingerprint(payload)}Schema", (BaseModel,), payload)
                 self.code_models[http_status] = r
         self.r = r

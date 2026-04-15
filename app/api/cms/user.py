@@ -6,7 +6,7 @@ user apis
 """
 
 import jwt
-from flask import Blueprint, current_app, g, request
+from flask import Blueprint, current_app, request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -61,21 +61,21 @@ def register(json: UserRegisterSchema):
     """
     注册新用户
     """
-    if manager.user_model.count_by_username(g.username) > 0:
+    if manager.user_model.count_by_username(json.username) > 0:
         raise Duplicated("用户名重复，请重新输入")  # type: ignore
-    if g.email and g.email.strip() != "":
-        if manager.user_model.count_by_email(g.email) > 0:
+    if json.email and json.email.strip() != "":
+        if manager.user_model.count_by_email(json.email) > 0:
             raise Duplicated("注册邮箱重复，请重新输入")  # type: ignore
     # create a user
     with db.auto_commit():
         user = manager.user_model()
-        user.username = g.username
-        if g.email and g.email.strip() != "":
-            user.email = g.email
+        user.username = json.username
+        if json.email and json.email.strip() != "":
+            user.email = json.email
         db.session.add(user)
         db.session.flush()
-        user.password = g.password
-        group_ids = g.group_ids
+        user.password = json.password
+        group_ids = json.group_ids
         # 如果没传分组数据，则将其设定为 guest 分组
         if len(group_ids) == 0:
             from app.lin import GroupLevelEnum
@@ -100,10 +100,10 @@ def login(json: LoginSchema):
     if current_app.config.get("LOGIN_CAPTCHA"):
         tag = request.headers.get("tag", "")
         secret_key = current_app.config.get("SECRET_KEY", "")
-        if g.captcha != jwt.decode(tag, secret_key, algorithms=["HS256"]).get("code"):
+        if json.captcha != jwt.decode(tag, secret_key, algorithms=["HS256"]).get("code"):
             raise Failed("验证码校验失败")  # type: ignore
 
-    user = manager.user_model.verify(g.username, g.password)
+    user = manager.user_model.verify(json.username, json.password)
     # 用户未登录，此处不能用装饰器记录日志
     Log.create_log(
         message=f"{user.username}登录成功获取了令牌",
@@ -133,17 +133,17 @@ def update(json: UserBaseInfoSchema):
     """
     user = get_current_user()
 
-    if g.email and user.email != g.email:
-        exists = manager.user_model.get(email=g.email)
+    if json.email and user.email != json.email:
+        exists = manager.user_model.get(email=json.email)
         if exists:
             raise ParameterError("邮箱已被注册，请重新输入邮箱")
     with db.auto_commit():
-        if g.email:
-            user.email = g.email
-        if g.nickname:
-            user.nickname = g.nickname
-        if g.avatar:
-            user._avatar = g.avatar
+        if json.email:
+            user.email = json.email
+        if json.nickname:
+            user.nickname = json.nickname
+        if json.avatar:
+            user._avatar = json.avatar
     raise Success("用户信息更新成功")
 
 
@@ -161,7 +161,7 @@ def change_password(json: ChangePasswordSchema):
     修改密码
     """
     user = get_current_user()
-    ok = user.change_password(g.old_password, g.new_password)
+    ok = user.change_password(json.old_password, json.new_password)
     if ok:
         db.session.commit()
         raise Success("密码修改成功")

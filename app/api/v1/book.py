@@ -5,7 +5,7 @@ a standard CRUD template of book
 :license: MIT, see LICENSE for more details.
 """
 
-from flask import Blueprint, g
+from flask import Blueprint
 
 from app.api import AuthorizationBearerSecurity, api
 from app.api.v1.exception import BookNotFound
@@ -52,7 +52,7 @@ def search(query: BookQuerySearchSchema):
     """
     关键字搜索图书
     """
-    return Book.query.filter(Book.title.like("%" + g.q + "%"), Book.is_deleted == False).all()
+    return Book.query.filter(Book.title.like("%" + query.q + "%"), Book.is_deleted == False).all()
 
 
 @book_api.route("", methods=["POST"])
@@ -66,7 +66,7 @@ def create_book(json: BookInSchema):
     """
     创建图书
     """
-    Book.create(**json.dict(), commit=True)
+    Book.create(**json.model_dump(), commit=True)
     raise Success(12)
 
 
@@ -85,7 +85,7 @@ def update_book(id, json: BookInSchema):
     if book:
         book.update(
             id=id,
-            **json.dict(),
+            **json.model_dump(),
             commit=True,
         )
         raise Success(13)

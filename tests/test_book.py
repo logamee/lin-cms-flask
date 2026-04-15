@@ -54,3 +54,32 @@ def test_delete():
         id = c.get("/v1/book", headers={"Authorization": "Bearer "}).get_json()[-1].get("id")
         rv = c.delete("/v1/book/{}".format(id), headers={"Authorization": "Bearer " + get_token()})
         assert rv.status_code == 200
+
+
+@pytest.mark.run(order=5)
+def test_get_books_openapi_response_schema():
+    with app.test_client() as c:
+        rv = c.get("/apidoc/openapi.json")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        schema_ref = data["paths"]["/v1/book"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        schema_name = schema_ref.split("/")[-1]
+        schema = data["components"]["schemas"][schema_name]
+
+        assert schema["type"] == "array"
+        assert "$ref" in schema["items"]
+
+
+def test_create_book_openapi_message_schema():
+    with app.test_client() as c:
+        rv = c.get("/apidoc/openapi.json")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        schema_ref = data["paths"]["/v1/book"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        schema_name = schema_ref.split("/")[-1]
+        schema = data["components"]["schemas"][schema_name]
+
+        assert schema_name.startswith("ApiMessageSchema")
+        assert set(schema["properties"]) == {"code", "message", "request"}

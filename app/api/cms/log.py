@@ -1,6 +1,6 @@
 import math
 
-from flask import Blueprint, g
+from flask import Blueprint
 from sqlalchemy import text
 
 from app.api import AuthorizationBearerSecurity, api
@@ -15,7 +15,6 @@ log_api = Blueprint("log", __name__)
 @group_required
 @api.validate(
     resp=DocResponse(r=LogPageSchema),
-    before=LogQuerySearchSchema.offset_handler,
     security=[AuthorizationBearerSecurity],
     tags=["日志"],
 )
@@ -25,12 +24,12 @@ def get_logs(query: LogQuerySearchSchema):
     """
     logs = Log.query.filter()
     total = logs.count()
-    items = logs.order_by(text("create_time desc")).offset(g.offset).limit(g.count).all()
-    total_page = math.ceil(total / g.count)
+    items = logs.order_by(text("create_time desc")).offset(query.offset).limit(query.count).all()
+    total_page = math.ceil(total / query.count)
 
     return LogPageSchema(
-        page=g.page,
-        count=g.count,
+        page=query.page,
+        count=query.count,
         total=total,
         items=items,
         total_page=total_page,
@@ -43,29 +42,28 @@ def get_logs(query: LogQuerySearchSchema):
 @api.validate(
     resp=DocResponse(r=LogPageSchema),
     security=[AuthorizationBearerSecurity],
-    before=LogQuerySearchSchema.offset_handler,
     tags=["日志"],
 )
 def search_logs(query: LogQuerySearchSchema):
     """
     日志搜索（人员，时间, 关键字），分页展示
     """
-    if g.keyword:
-        logs = Log.query.filter(Log.message.like(f"%{g.keyword}%"))
+    if query.keyword:
+        logs = Log.query.filter(Log.message.like(f"%{query.keyword}%"))
     else:
         logs = Log.query.filter()
-    if g.name:
-        logs = logs.filter(Log.username == g.name)
-    if g.start and g.end:
-        logs = logs.filter(Log.create_time.between(g.start, g.end))
+    if query.name:
+        logs = logs.filter(Log.username == query.name)
+    if query.start and query.end:
+        logs = logs.filter(Log.create_time.between(query.start, query.end))
 
     total = logs.count()
-    items = logs.order_by(text("create_time desc")).offset(g.offset).limit(g.count).all()
-    total_page = math.ceil(total / g.count)
+    items = logs.order_by(text("create_time desc")).offset(query.offset).limit(query.count).all()
+    total_page = math.ceil(total / query.count)
 
     return LogPageSchema(
-        page=g.page,
-        count=g.count,
+        page=query.page,
+        count=query.count,
         total=total,
         items=items,
         total_page=total_page,

@@ -7,16 +7,25 @@
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from flask import Blueprint, Flask
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.exc import DatabaseError
 
-from .apidoc import schema_response
 from .db import db
 from .encoder import JSONEncoder, auto_response
-from .exception import APIException, HTTPException, InternalServerError
+from .exception import APIException, HTTPException, InternalServerError, ParameterError
 from .jwt import jwt
 from .manager import Manager
 from .syslogger import SysLogger
 from .utils import permission_meta_infos
+
+
+def _flatten_pydantic_errors(exc: PydanticValidationError) -> str:
+    errors = []
+    for error in exc.errors():
+        loc = error.get("loc", ())
+        field = ".".join(str(item) for item in loc) if loc else "value"
+        errors.append(f"{field} {error['msg']}")
+    return " and ".join(errors)
 
 
 class Lin(object):
@@ -159,6 +168,8 @@ class Lin(object):
         def handler(e: Exception) -> Any:
             if isinstance(e, APIException):
                 return e
+            if isinstance(e, PydanticValidationError):
+                return ParameterError(_flatten_pydantic_errors(e))
             if isinstance(e, HTTPException):
                 code = e.code
                 message = e.description
@@ -177,4 +188,3 @@ class Lin(object):
         # app.json_encoder = self.jsonencoder or JSONEncoder
         app.json = self.jsonencoder(app) if self.jsonencoder else JSONEncoder(app)
         app.make_response = auto_response(app.make_response)
-        schema_response(app)

@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from app.lin import BaseModel
 from app.schema import BasePageSchema, QueryPageSchema, datetime_regex
@@ -18,10 +18,11 @@ class LogQuerySearchSchema(QueryPageSchema):
     start: Optional[str] = Field(None, description="YY-MM-DD HH:MM:SS")
     end: Optional[str] = Field(None, description="YY-MM-DD HH:MM:SS")
 
-    @validator("start", "end")
-    def datetime_match(cls, v):
-        if re.match(datetime_regex, v):
-            return v
+    @field_validator("start", "end")
+    @classmethod
+    def datetime_match(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or re.match(datetime_regex, value):
+            return value
         raise ValueError("时间格式有误")
 
 
