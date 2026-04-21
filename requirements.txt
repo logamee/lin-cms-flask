@@ -22,7 +22,7 @@ pycparser==2.22 ; platform_python_implementation == 'CPython' and sys_platform =
 pydantic==2.13.0
 pydantic-core==2.46.0
 pyjwt==2.10.1
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 setuptools==76.0.0
 spectree==2.0.1
 sqlalchemy==2.0.49
