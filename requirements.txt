@@ -23,7 +23,7 @@ pydantic==2.13.0
 pydantic-core==2.46.0
 pyjwt==2.10.1
 python-dotenv==1.2.2
-setuptools==76.0.0
+setuptools==78.1.1
 spectree==2.0.1
 sqlalchemy==2.0.49
 tablib==3.9.0
