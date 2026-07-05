@@ -15,7 +15,7 @@
     <a href="https://www.python.org/" rel="nofollow">
     <img src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" alt="Python version" data-canonical-src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" style="max-width:100%;">
     </a>
-      <a href="https://doc.cms.talelin.com/" rel="nofollow"><img src="https://img.shields.io/badge/license-MIT-skyblue.svg" alt="LISENCE" data-canonical-src="https://img.shields.io/badge/license-MIT-skyblue.svg" style="max-width:100%;"></a>
+      <a href="https://doc.cms.talelin.com/" rel="nofollow"><img src="https://img.shields.io/badge/license-MIT-skyblue.svg" alt="License" data-canonical-src="https://img.shields.io/badge/license-MIT-skyblue.svg" style="max-width:100%;"></a>
 </p>
 
 <blockquote align="center">
