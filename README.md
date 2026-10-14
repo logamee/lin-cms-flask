@@ -22,7 +22,7 @@
 
 <blockquote align="center">
   <em>Lin-CMS</em> 是林间有风团队经过大量项目实践所提炼出的一套<strong>内容管理系统框架</strong>。<br>
- Lin-CMS 可以有效的帮助开发者提高 CMS 的开发效率。
+ 本仓库在其 Flask 实现的基础上继续维护：收紧了安全默认值，补上了 CI 与部署配置，适合直接拿来二次开发。
 </blockquote>
 
 <p align="center">
@@ -118,10 +118,10 @@ uv sync --extra postgres     # PostgreSQL 驱动 (psycopg 3)
 
 ```ini
 # MySQL
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123456@localhost:3306/lincmsdev'
-# PostgreSQL —— 注意：SQLAlchemy 2.1 起 postgresql:// 默认驱动已从 psycopg2 换为 psycopg 3，
+SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:***@localhost:3306/lincmsdev'
+# PostgreSQL 注意：SQLAlchemy 2.1 起 postgresql:// 默认驱动已从 psycopg2 换为 psycopg 3，
 # 请勿单独安装 psycopg2-binary，它无法匹配裸 postgresql:// 连接串
-SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:123456@localhost:5432/lincmsdev'
+SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:***@localhost:5432/lincmsdev'
 ```
 
 数据库结构由 **Flask-Migrate (Alembic)** 管理。命令习惯与旧版保持一致：
@@ -133,7 +133,7 @@ uv run flask db fake         # 补充示例图书数据（演示用途，手动�
 ```
 
 > `flask db init` 内部即 `flask db upgrade`（alembic 按 alembic_version 记录幂等）；
-> alembic 原生的 init（创建迁移仓库）已被有意遮蔽——`migrations/` 随仓库提交，本项目无需再 scaffold。
+> alembic 原生的 init（创建迁移仓库）已被有意遮蔽：`migrations/` 随仓库提交，本项目无需再 scaffold。
 
 日常开发改了模型后：
 
@@ -142,7 +142,7 @@ uv run flask db migrate -m "add xxx column"   # 生成增量迁移（SQLite 自�
 uv run flask db upgrade                        # 应用
 ```
 
-> **存量库升级到迁移体系**（一次性）：`uv run flask db stamp head`——只登记版本不执行 DDL。
+> **存量库升级到迁移体系**（一次性）：`uv run flask db stamp head`，只登记版本不执行 DDL。
 > **启用插件后**（poem/oss/cos 等）：插件表只在启用时注册，必须重新 `flask db migrate` 生成增量，否则漂移。
 
 ### 测试与代码质量
@@ -179,7 +179,7 @@ uv export --no-hashes --no-dev --extra mysql -o requirements.txt     # Docker �
 uv export --no-hashes --no-dev --extra postgres -o requirements.txt  # Docker 用 PostgreSQL 时
 ```
 
-### Docker Compose 一键部署
+### Docker Compose 部署
 
 ```bash
 # 生产模式强制要求 SECRET_KEY；写在同目录 .env 或环境变量中
@@ -223,9 +223,9 @@ curl http://127.0.0.1:5000/health      # 存活探针（无认证）
 
 **一次性动作（按序执行）：**
 
-1. 准备环境文件：`cp .env.example .development.env`（生产为 `.production.env`）并填入 `SECRET_KEY`——**缺失会拒绝启动**（旧版有公网缺省值凑合，现已移除）
+1. 准备环境文件：`cp .env.example .development.env`（生产为 `.production.env`）并填入 `SECRET_KEY`（**缺失会拒绝启动**，旧版有公网缺省值凑合，现已移除）
 2. 存量库登记迁移版本：`uv run flask db stamp head`（从未含「会话撤销」的版本直升的，先执行上面框中的 `ALTER TABLE` 补列）
-3. 生产环境前后端**不同域名**部署的，必须配置 `CORS_ORIGINS` 白名单——旧版全放行，未配置将拦截跨域请求
+3. 生产环境前后端**不同域名**部署的，必须配置 `CORS_ORIGINS` 白名单：旧版全放行，不配置会拦截跨域请求
 
 **升级后的可感知变化（均为有意行为）：**
 

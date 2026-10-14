@@ -1,7 +1,5 @@
 # 贡献指南
 
-感谢你愿意为 Lin-CMS-Flask 贡献代码。
-
 ## 开发环境
 
 ```bash
@@ -28,7 +26,7 @@ uv run pytest -q
 
 - 全部通过；`uv run coverage run -m pytest -q && uv run coverage report` 总覆盖率不得低于 70%，新增代码请顺手补测试
 - 涉及模型变更必须同时提供 alembic 迁移（`uv run flask db migrate`），并确认 CI 的迁移检查（全新库 upgrade + `flask db check` 无漂移）通过
-- 新增带权限的接口时，`@permission_meta` 必须紧贴路由装饰器、位于 `@limiter.limit` 等包装型装饰器之上——顺序叠反不会报错，但权限声明不会同步进权限表（`tests/test_permission_sync.py` 会拦）
+- 新增带权限的接口时，`@permission_meta` 必须紧贴路由装饰器、位于 `@limiter.limit` 等包装型装饰器之上。顺序叠反不会报错，但权限声明不会同步进权限表（`tests/test_permission_sync.py` 会拦）
 - 不引入新的生产依赖除非必要；引入了请同步更新 `pyproject.toml` 并执行 `uv lock` 与 `uv export --no-hashes --no-dev -o requirements.txt`
 
 ## 提交规范

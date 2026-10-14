@@ -5,7 +5,7 @@
 
 ## [0.7.0] - 2026-10-14
 
-以"可二次开发的后端脚手架"为目标的安全加固与工程化版本。
+安全加固与工程化版本：收紧安全默认值，补上 CI 与发布流水线，把仓库整理成可直接二次开发的脚手架。
 
 ### 新增
 
@@ -16,7 +16,7 @@
 - `app/config/test.py` 测试环境配置（内存库，关闭限流）
 - `.env.example` 环境变量模板；`.development.env` / `.production.env` 移出版本库
 - 文档：CONTRIBUTING.md、SECURITY.md、issue/PR 模板
-- 开发工具链迁移到 PEP 735 `[dependency-groups]`，`uv sync` 一条命令还原开发环境
+- 开发工具链迁移到 PEP 735 `[dependency-groups]`，`uv sync` 默认包含，与生产依赖分开
 
 ### 变更
 
@@ -27,7 +27,7 @@
 - CORS 默认收紧为仅同源；开发环境放行本地前端 dev server
 - 生产环境关闭 Swagger UI 与 OpenAPI 规范导出
 - Docker 镜像以非 root 用户运行；compose 提供 SECRET_KEY/数据库注入、SQLite 具名卷与容器健康检查
-- 依赖全面升级（Flask 3.1 / SQLAlchemy 2.1 / Pydantic 2 / Spectree 3 / gevent 26 等）
+- 依赖升级（Flask 3.1 / SQLAlchemy 2.1 / Pydantic 2 / Spectree 3 / gevent 26 等）
 
 ### 修复
 
