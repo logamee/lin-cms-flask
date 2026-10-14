@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 
 def register_blueprints(app: Flask) -> None:
     from app.api.cms import create_cms
+    from app.api.health import health_api
     from app.api.v1 import create_v1
 
+    # 存活探针挂在应用根路径（/health），供 compose/k8s 健康检查使用
+    app.register_blueprint(health_api)
     app.register_blueprint(create_v1(), url_prefix="/v1")
     app.register_blueprint(create_cms(), url_prefix="/cms")
 
