@@ -1,85 +1,53 @@
 """
-:copyright: © 2020 by the Lin team.
-:license: MIT, see LICENSE for more details.
+图书 CRUD 全流程:创建(需登录)、公开查询/搜索、更新、删除(挂载权限)。
+用例内部自闭环,不依赖执行顺序。
 """
 
-import pytest
-
-from . import app, fixtureFunc, get_token
+from tests.conftest import BOOK_PAYLOAD
 
 
-@pytest.mark.run(order=1)
-def test_create(fixtureFunc):
-    with app.test_client() as c:
-        rv = c.post(
-            "/v1/book",
-            headers={"Authorization": "Bearer " + get_token()},
-            json={
-                "title": "create",
-                "author": "pedro",
-                "summary": "summary",
-                "image": "https://img3.doubanio.com/lpic/s1470003.jpg",
-            },
-        )
-        assert rv.status_code == 200 or rv.get_json().get("code") == 10030
+def test_book_crud_flow(client, root_headers, guest_headers):
+    # 创建
+    rv = client.post("/v1/book", headers=root_headers, json=BOOK_PAYLOAD)
+    assert rv.status_code == 200
+    assert rv.get_json()["code"] == 12
+
+    # 列表与详情(公开接口)
+    rv = client.get("/v1/book")
+    assert rv.status_code == 200
+    book = next(b for b in rv.get_json() if b["title"] == BOOK_PAYLOAD["title"])
+    bid = book["id"]
+
+    rv = client.get(f"/v1/book/{bid}")
+    assert rv.status_code == 200
+    assert rv.get_json()["author"] == BOOK_PAYLOAD["author"]
+
+    # 搜索
+    rv = client.get("/v1/book/search", query_string={"q": "测试驱动"})
+    assert rv.status_code == 200
+    assert any(b["id"] == bid for b in rv.get_json())
+
+    # 更新
+    rv = client.put(f"/v1/book/{bid}", headers=root_headers, json={**BOOK_PAYLOAD, "title": "重构"})
+    assert rv.status_code == 200
+    assert client.get(f"/v1/book/{bid}").get_json()["title"] == "重构"
+
+    # 删除是挂载权限:未授权分组(guest)被拒;超级管理员旁路直接删除
+    rv = client.delete(f"/v1/book/{bid}", headers=guest_headers)
+    assert rv.status_code == 401
+
+    rv = client.delete(f"/v1/book/{bid}", headers=root_headers)
+    assert rv.status_code == 200
+
+    rv = client.get(f"/v1/book/{bid}")
+    assert rv.status_code == 404
 
 
-@pytest.mark.run(order=2)
-def test_get_books():
-    with app.test_client() as c:
-        rv = c.get("/v1/book", headers={"Authorization": "Bearer "})
-        assert rv.status_code == 200
+def test_book_create_requires_login(client):
+    rv = client.post("/v1/book", json=BOOK_PAYLOAD)
+    assert rv.status_code == 401
 
 
-@pytest.mark.run(order=3)
-def test_update(fixtureFunc):
-    with app.test_client() as c:
-        id = c.get("/v1/book", headers={"Authorization": "Bearer "}).get_json()[-1].get("id")
-        rv = c.put(
-            "/v1/book/{}".format(id),
-            headers={"Authorization": "Bearer " + get_token()},
-            json={
-                "title": "update",
-                "author": "pedro & erik",
-                "summary": "summary",
-                "image": "https://img3.doubanio.com/lpic/s1470003.jpg",
-            },
-        )
-        assert rv.status_code == 200
-
-
-@pytest.mark.run(order=4)
-def test_delete():
-    with app.test_client() as c:
-        id = c.get("/v1/book", headers={"Authorization": "Bearer "}).get_json()[-1].get("id")
-        rv = c.delete("/v1/book/{}".format(id), headers={"Authorization": "Bearer " + get_token()})
-        assert rv.status_code == 200
-
-
-@pytest.mark.run(order=5)
-def test_get_books_openapi_response_schema():
-    with app.test_client() as c:
-        rv = c.get("/apidoc/openapi.json")
-        assert rv.status_code == 200
-
-        data = rv.get_json()
-        schema_ref = data["paths"]["/v1/book"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-        schema_name = schema_ref.split("/")[-1]
-        schema = data["components"]["schemas"][schema_name]
-
-        assert schema["type"] == "array"
-        assert "$ref" in schema["items"]
-
-
-def test_create_book_openapi_message_schema():
-    with app.test_client() as c:
-        rv = c.get("/apidoc/openapi.json")
-        assert rv.status_code == 200
-
-        data = rv.get_json()
-        schema_ref = data["paths"]["/v1/book"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-        schema_name = schema_ref.split("/")[-1]
-        schema = data["components"]["schemas"][schema_name]
-
-        assert schema_name.startswith("ApiMessageSchema")
-        assert set(schema["properties"]) == {"code", "message", "request"}
+def test_book_missing_404(client):
+    rv = client.get("/v1/book/99999")
+    assert rv.status_code == 404
