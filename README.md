@@ -10,6 +10,8 @@
 <h4 align="center">一个简单易用的CMS后端项目 | <a href="https://doc.cms.talelin.com/" target="_blank">Lin-CMS-Flask</a></h4>
 
 <p align="center">
+  <a href="https://github.com/logamee/lin-cms-flask/actions/workflows/ci.yml">
+  <img src="https://img.shields.io/github/actions/workflow/status/logamee/lin-cms-flask/ci.yml?branch=master&label=CI" alt="CI status"></a>
   <a href="https://flask.palletsprojects.com/en/3.1.x/" rel="nofollow">
   <img src="https://img.shields.io/badge/Flask-3.1.3-green.svg" alt="Flask version" data-canonical-src="https://img.shields.io/badge/Flask-3.1.3-green.svg" style="max-width:100%;"></a>
     <a href="https://www.python.org/" rel="nofollow">
@@ -100,8 +102,8 @@ Lin CMS 还将提供一套类似于 Vue Element 的前端组件库，以方便�
 
 ```bash
 cp .env.example .development.env   # 首次克隆必做：复制模板并填入 SECRET_KEY（缺失会拒绝启动）
-uv sync --extra dev          # 安装项目 + 开发工具链
-uv run flask db init         # 建表 + 种子数据（与旧版命令一致）
+uv sync                      # 安装项目 + 开发工具链（PEP 735 dev 依赖组默认包含）
+uv run flask db init         # 建表 + 种子数据（与旧版命令一致；默认账号 root/123456，请尽快修改）
 uv run flask run             # 启动开发服务器（默认 sqlite，读取 .development.env）
 ```
 
@@ -156,13 +158,26 @@ uv run pre-commit install    # 提交钩子：isort / black / flake8 / mypy
 `requirements.txt` 由 uv.lock 导出，**请勿手工编辑**；升级依赖后重新生成：
 
 ```bash
-uv lock --upgrade && uv sync --extra dev && uv run pytest   # 升级 → 安装 → 回归
-uv export --no-hashes -o requirements.txt                   # Docker 用（默认 sqlite）
-uv export --no-hashes --extra mysql -o requirements.txt     # Docker 用 MySQL 时
-uv export --no-hashes -o postgres -o requirements.txt       # Docker 用 PostgreSQL 时
+uv lock --upgrade && uv sync && uv run pytest          # 升级 → 安装 → 回归
+uv export --no-hashes --no-dev -o requirements.txt     # Docker 用（默认 sqlite，不含开发工具链）
+uv export --no-hashes --no-dev --extra mysql -o requirements.txt     # Docker 用 MySQL 时
+uv export --no-hashes --no-dev --extra postgres -o requirements.txt  # Docker 用 PostgreSQL 时
 ```
 
-应用通过 gunicorn + gevent 启动（见 `gunicorn.conf.py`）。**生产环境自动关闭 `/apidoc/*` 文档、`/` 与 `/hello` 演示路由。**
+### Docker Compose 一键部署
+
+```bash
+# 生产模式强制要求 SECRET_KEY；写在同目录 .env 或环境变量中
+echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')" > .env
+docker compose up -d --build
+curl http://127.0.0.1:5000/health      # 存活探针（无认证）
+```
+
+容器以非 root 用户运行，启动时自动迁移（空库自动播种 root/123456），默认 SQLite 数据落在具名卷 `instance-data`；换外部数据库改 compose 中的 `SQLALCHEMY_DATABASE_URI` 即可。
+
+推送 `v*` 标签会触发 [Release 流水线](.github/workflows/release.yml)：复用 CI 全部质量门禁，通过后自动构建镜像推送到 ghcr.io 并创建 GitHub Release。
+
+应用通过 gunicorn + gevent 启动（见 `gunicorn.conf.py`）。**生产环境自动关闭 `/apidoc/*` 文档、`/` 与 `/hello` 演示路由；`/health` 探针始终可用。**
 
 #### 生产环境配置清单（.{env}.env / 环境变量）
 
@@ -208,3 +223,9 @@ uv export --no-hashes -o postgres -o requirements.txt       # Docker 用 Postgre
 | 启动不再自动建表；改模型需 `flask db migrate && flask db upgrade` | 开发多一步；CI 的 `flask db check` 会拦截漏迁移 |
 
 >`flask db init`（含 `--force`）与 `flask db fake` 的命令习惯与旧版完全一致，无需改变。
+
+## 参与贡献
+
+- 版本历史：[CHANGELOG.md](CHANGELOG.md)
+- 贡献流程与本地门禁：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 安全漏洞报告：[SECURITY.md](SECURITY.md)（请勿开公开 issue）
