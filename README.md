@@ -13,7 +13,7 @@
   <a href="https://flask.palletsprojects.com/en/3.1.x/" rel="nofollow">
   <img src="https://img.shields.io/badge/Flask-3.1.3-green.svg" alt="Flask version" data-canonical-src="https://img.shields.io/badge/Flask-3.1.3-green.svg" style="max-width:100%;"></a>
     <a href="https://www.python.org/" rel="nofollow">
-    <img src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" alt="Python version" data-canonical-src="https://img.shields.io/badge/python->=3.10,<3.15-red.svg" style="max-width:100%;">
+    <img src="https://img.shields.io/badge/python->=3.11,<3.15-red.svg" alt="Python version" data-canonical-src="https://img.shields.io/badge/python->=3.11,<3.15-red.svg" style="max-width:100%;">
     </a>
       <a href="https://doc.cms.talelin.com/" rel="nofollow"><img src="https://img.shields.io/badge/license-MIT-skyblue.svg" alt="License" data-canonical-src="https://img.shields.io/badge/license-MIT-skyblue.svg" style="max-width:100%;"></a>
 </p>
@@ -90,3 +90,121 @@ Lin CMS 还将提供一套类似于 Vue Element 的前端组件库，以方便�
 
 我们将提供尽可能完善的[文档](https://doc.cms.talelin.com)
 来帮助开发者使用 Lin CMS
+
+## 开发与部署
+
+### 环境要求
+
+- Python >= 3.11（3.10 已停止维护，且当前依赖链不再支持）
+- [uv](https://docs.astral.sh/uv/) 作为包管理器（替代旧版的 poetry，所有命令通过 `uv run` 执行）
+
+```bash
+cp .env.example .development.env   # 首次克隆必做：复制模板并填入 SECRET_KEY（缺失会拒绝启动）
+uv sync --extra dev          # 安装项目 + 开发工具链
+uv run flask db init         # 建表 + 种子数据（与旧版命令一致）
+uv run flask run             # 启动开发服务器（默认 sqlite，读取 .development.env）
+```
+
+### 数据库
+
+默认使用 SQLite，无需额外安装。切换数据库前需先安装对应的驱动扩展，再修改 `.development.env` / `.production.env` 中的 `SQLALCHEMY_DATABASE_URI`：
+
+```bash
+uv sync --extra mysql        # MySQL 驱动 (PyMySQL)
+uv sync --extra postgres     # PostgreSQL 驱动 (psycopg 3)
+```
+
+```ini
+# MySQL
+SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123456@localhost:3306/lincmsdev'
+# PostgreSQL —— 注意：SQLAlchemy 2.1 起 postgresql:// 默认驱动已从 psycopg2 换为 psycopg 3，
+# 请勿单独安装 psycopg2-binary，它无法匹配裸 postgresql:// 连接串
+SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:123456@localhost:5432/lincmsdev'
+```
+
+数据库结构由 **Flask-Migrate (Alembic)** 管理。命令习惯与旧版保持一致：
+
+```bash
+uv run flask db init         # 建表 + 种子数据（root/123456、Guest 分组、权限同步）；幂等，重复执行无副作用
+uv run flask db init --force # 清空重建（确认后执行）
+uv run flask db fake         # 补充示例图书数据（演示用途，手动执行）
+```
+
+> `flask db init` 内部即 `flask db upgrade`（alembic 按 alembic_version 记录幂等）；
+> alembic 原生的 init（创建迁移仓库）已被有意遮蔽——`migrations/` 随仓库提交，本项目无需再 scaffold。
+
+日常开发改了模型后：
+
+```bash
+uv run flask db migrate -m "add xxx column"   # 生成增量迁移（SQLite 自动 batch 模式）
+uv run flask db upgrade                        # 应用
+```
+
+> **存量库升级到迁移体系**（一次性）：`uv run flask db stamp head`——只登记版本不执行 DDL。
+> **启用插件后**（poem/oss/cos 等）：插件表只在启用时注册，必须重新 `flask db migrate` 生成增量，否则漂移。
+
+### 测试与代码质量
+
+```bash
+uv run pytest                # 全量测试（内存 SQLite，与开发库完全隔离，可任意顺序执行）
+uv run coverage run -m pytest && uv run coverage report
+uv run pre-commit install    # 提交钩子：isort / black / flake8 / mypy
+```
+
+### 生产部署
+
+`requirements.txt` 由 uv.lock 导出，**请勿手工编辑**；升级依赖后重新生成：
+
+```bash
+uv lock --upgrade && uv sync --extra dev && uv run pytest   # 升级 → 安装 → 回归
+uv export --no-hashes -o requirements.txt                   # Docker 用（默认 sqlite）
+uv export --no-hashes --extra mysql -o requirements.txt     # Docker 用 MySQL 时
+uv export --no-hashes -o postgres -o requirements.txt       # Docker 用 PostgreSQL 时
+```
+
+应用通过 gunicorn + gevent 启动（见 `gunicorn.conf.py`）。**生产环境自动关闭 `/apidoc/*` 文档、`/` 与 `/hello` 演示路由。**
+
+#### 生产环境配置清单（.{env}.env / 环境变量）
+
+| 配置 | 必填 | 说明 |
+|---|---|---|
+| `SECRET_KEY` | ✅ | JWT 签名密钥，未设置启动即报错；生成：`python -c 'import secrets; print(secrets.token_hex(32))'` |
+| `SQLALCHEMY_DATABASE_URI` | ✅ | 生产必须显式配置；使用 SQLite 会输出告警 |
+| `FLASK_ENV` | ✅ | `development` / `production` / `test`，非法值启动即报错 |
+| `CORS_ORIGINS` | 生产建议 | 开发环境**默认放行** `localhost/127.0.0.1:5173`，零配置可用；逗号分隔可覆盖（如前端跑 3000 端口时）。生产默认空（仅同源），跨域部署必配 |
+| `SITE_DOMAIN` | 建议 | 文件上传外链域名；未配置时按请求 Host 拼接 |
+| `RATELIMIT_STORAGE_URI` | 建议 | 限流共享存储（如 `redis://localhost:6379/0`）；缺省内存存储在多 worker 下按进程各自计数（启动有告警） |
+| `PROXY_FIX` | 按需 | 反向代理后设 `True`，按 `X-Forwarded-For` 还原真实客户端 IP（限流依赖） |
+
+> 环境变量文件模板见 `.env.example`；`.*.env` 已入 `.gitignore`，禁止提交真实密钥。
+
+#### 安全基线（内置，无需配置）
+
+- 密码策略：6-22 位（保持老用户习惯，无复杂度强制）
+- 认证接口限流：登录/刷新 20 次/分钟，验证码 30 次/分钟，注册 10 次/小时
+- refresh token 有效期 7 天；`POST /cms/user/logout` 可吊销令牌，**修改/重置密码会吊销该用户全部存量令牌**
+- 请求日志自动脱敏（password/token 等字段）
+
+> 从旧版本直接升级到当前版本（跳过中间过程）的存量库：先补列
+> `ALTER TABLE lin_user ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;`，
+> 再执行 `uv run flask db stamp head` 登记迁移版本，之后统一走 `flask db upgrade`。
+
+#### 从旧版本升级：一次性动作与行为变化
+
+**一次性动作（按序执行）：**
+
+1. 准备环境文件：`cp .env.example .development.env`（生产为 `.production.env`）并填入 `SECRET_KEY`——**缺失会拒绝启动**（旧版有公网缺省值凑合，现已移除）
+2. 存量库登记迁移版本：`uv run flask db stamp head`（从未含「会话撤销」的版本直升的，先执行上面框中的 `ALTER TABLE` 补列）
+3. 生产环境前后端**不同域名**部署的，必须配置 `CORS_ORIGINS` 白名单——旧版全放行，未配置将拦截跨域请求
+
+**升级后的可感知变化（均为有意行为）：**
+
+| 变化 | 影响 |
+|---|---|
+| 改密/管理员重置密码 → 该用户全部已登录设备立即下线 | 更安全；前端可调 `POST /cms/user/logout` 主动登出 |
+| 认证接口限流（数值见上方安全基线） | 手动使用无感；自动化脚本/高频轮询会收到 429 |
+| 日志查询的用户名/时间过滤真实生效 | 旧版忽略这些参数恒返回全量；现在结果可能变少（修复） |
+| `/apidoc/*` 与 `/`、`/hello` 仅非生产环境可用 | 生产看文档请到预发/开发环境 |
+| 启动不再自动建表；改模型需 `flask db migrate && flask db upgrade` | 开发多一步；CI 的 `flask db check` 会拦截漏迁移 |
+
+>`flask db init`（含 `--force`）与 `flask db fake` 的命令习惯与旧版完全一致，无需改变。
