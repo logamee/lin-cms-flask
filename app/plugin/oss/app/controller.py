@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict, Optional
 
 import oss2
 from flask import jsonify, request
@@ -13,13 +14,10 @@ api = Redprint("oss")
 @api.route("/upload_to_local", methods=["POST"])
 def upload():
     image = request.files.get("image", None)
-    if not image:
-        raise ParameterError("没有找到图片")
-    if image and allowed_file(image.filename):
-        path = os.path.join(lin_config.get_config("oss.upload_folder"), image.filename)
-        image.save(path)
-    else:
-        raise ParameterError("图片类型不允许或图片key不合法")
+    if not image or not allowed_file(image.filename or ""):
+        raise ParameterError("没有找到图片或图片类型不允许")
+    path = os.path.join(lin_config.get_config("oss.upload_folder"), image.filename or "")
+    image.save(path)
     raise Success()
 
 
@@ -28,10 +26,10 @@ def upload_to_ali():
     image = request.files.get("image", None)
     if not image:
         raise ParameterError("没有找到图片")
-    if image and allowed_file(image.filename):
-        url = upload_image_bytes(image.filename, image)
+    if image and allowed_file(image.filename or ""):
+        url = upload_image_bytes(image.filename or "", image.read())
         if url:
-            res = {"url": url}
+            res: Dict[str, Any] = {"url": url}
             with db.auto_commit():
                 exist = OSS.get(url=url)
                 if not exist:
@@ -52,8 +50,8 @@ def upload_multiple_to_ali():
         img = request.files.get(item, None)
         if not img:
             raise ParameterError("没接收到图片，请检查图片路径")
-        if img and allowed_file(img.filename):
-            url = upload_image_bytes(img.filename, img)
+        if img and allowed_file(img.filename or ""):
+            url = upload_image_bytes(img.filename or "", img.read())
             if url:
                 # 每上传成功一次图片需记录到数据库
                 with db.auto_commit():
@@ -68,11 +66,11 @@ def upload_multiple_to_ali():
     return jsonify(imgs)
 
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1] in lin_config.get_config("oss.allowed_extensions", [])
 
 
-def upload_image_bytes(name: str, data: bytes):
+def upload_image_bytes(name: str, data: bytes) -> Optional[str]:
     access_key_id = lin_config.get_config("oss.access_key_id")
     access_key_secret = lin_config.get_config("oss.access_key_secret")
     auth = oss2.Auth(access_key_id, access_key_secret)

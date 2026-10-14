@@ -6,6 +6,7 @@ admin apis
 """
 
 import math
+from typing import Any, Dict
 
 from flask import Blueprint
 from sqlalchemy import func
@@ -62,7 +63,7 @@ def permissions():
     security=[AuthorizationBearerSecurity],
     resp=DocResponse(r=AdminUserPageSchema),
 )
-def get_admin_users(query: QueryPageWithGroupIdSchema):
+def get_admin_users(query: QueryPageWithGroupIdSchema) -> Dict[str, Any]:
     """
     查询所有用户及其所属组信息
     """
@@ -79,50 +80,48 @@ def get_admin_users(query: QueryPageWithGroupIdSchema):
         .scalar()
     )
     # 获取当前分页条件下查询到的非Root组的用户id
-    query_current_page_user_ids = (
-        db.session.query(manager.user_group_model.user_id)
+    # 部分数据库不支持子语句 in limit，故先物化为列表
+    current_page_user_ids = [
+        row[0]
+        for row in db.session.query(manager.user_group_model.user_id)
         .filter(manager.user_group_model.group_id.in_(query_group_id))
         .group_by(manager.user_group_model.user_id)
         .offset(query.offset)
         .limit(query.count)
-    )
-    # 部分数据库不支持子语句 in limit
-    current_page_user_ids = [user_id[0] for user_id in query_current_page_user_ids.all()]
-    # 获取用户的基本信息
-    current_page_users = manager.user_model.query.filter(manager.user_model.id.in_(current_page_user_ids)).all()
-    # 获取需要填充分组的基本信息
-    current_groups = manager.group_model.query.filter(
-        manager.group_model.id.in_(
-            db.session.query(manager.user_group_model.group_id)
-            .filter(manager.user_group_model.user_id.in_(current_page_user_ids))
-            .group_by(manager.user_group_model.group_id)
-        )
-    ).all()
-    # 获取这些用户和分组的多对多关联关系
-    user_group_relations = (
-        db.session.query(manager.user_group_model)
-        .filter(manager.user_group_model.user_id.in_(current_page_user_ids))
+        .all()
+    ]
+    total_page = math.ceil(total / query.count) if total else 0
+    if not current_page_user_ids:
+        return {"items": [], "count": query.count, "page": query.page, "total": total, "total_page": total_page}
+    # 一次 join 拿到 (用户, 分组) 对，替代原先 3 条查询 + O(users×groups×relations) 三重循环拼装
+    user_group_pairs = (
+        db.session.query(manager.user_model, manager.group_model)
+        .join(manager.user_group_model, manager.user_group_model.user_id == manager.user_model.id)
+        .join(manager.group_model, manager.group_model.id == manager.user_group_model.group_id)
+        .filter(manager.user_model.id.in_(current_page_user_ids))
         .all()
     )
-    # 根据关联关系拼装的items数据结构
+    users_by_id = {user.id: user for user, _ in user_group_pairs}
+    groups_by_user: Dict[int, list] = {uid: [] for uid in current_page_user_ids}
+    for user, group in user_group_pairs:
+        groups_by_user[user.id].append(group)
     items = [
-        AdminUserSchema(email=user.email, groups=list(), id=user.id, username=user.username)
-        for user in current_page_users
+        AdminUserSchema(
+            email=users_by_id[uid].email,
+            groups=groups_by_user[uid],
+            id=uid,
+            username=users_by_id[uid].username,
+        )
+        for uid in current_page_user_ids
+        if uid in users_by_id
     ]
-    # 填充分组信息
-    for item in items:
-        for ug in user_group_relations:
-            if ug.user_id == item.id:
-                for group in current_groups:
-                    if ug.group_id == group.id:
-                        item.groups.append(group)
 
     return {
         "items": items,
         "count": query.count,
         "page": query.page,
         "total": total,
-        "total_page": math.ceil(total / query.count),
+        "total_page": total_page,
     }
 
 
@@ -158,7 +157,7 @@ def change_user_password(uid: int, json: ResetPasswordSchema):
     security=[AuthorizationBearerSecurity],
     resp=DocResponse(NotFound("用户不存在"), Success("删除成功"), Forbidden("用户不能删除")),
 )
-def delete_user(uid):
+def delete_user(uid: int):
     """
     删除用户
     """
@@ -166,8 +165,8 @@ def delete_user(uid):
     if user is None:
         raise NotFound("用户不存在")
     groups = manager.group_model.select_by_user_id(uid)
-    # 超级管理员分组的用户仅有一个分组
-    if groups[0].level == GroupLevelEnum.ROOT.value:
+    # 超级管理员分组的用户仅有一个分组；无分组用户不属于 Root，直接放行删除
+    if groups and groups[0].level == GroupLevelEnum.ROOT.value:
         raise Forbidden("无法删除此用户")
     with db.auto_commit():
         manager.user_group_model.query.filter_by(user_id=uid).delete(synchronize_session=False)
@@ -200,20 +199,7 @@ def update_user(uid: int, json: UpdateUserInfoSchema):
             raise ParameterError("邮箱已被注册，请重新输入邮箱")
     with db.auto_commit():
         user.email = json.email
-        group_ids = json.group_ids
-        # 清空原来的所有关联关系
-        manager.user_group_model.query.filter_by(user_id=user.id).delete(synchronize_session=False)
-        # 根据传入分组ids 新增关联记录
-        user_group_list = list()
-        # 如果没传分组数据，则将其设定为 guest 分组
-        if not group_ids:
-            group_ids = [manager.group_model.get(level=GroupLevelEnum.GUEST.value).id]
-        for group_id in group_ids:
-            user_group = manager.user_group_model()
-            user_group.user_id = user.id
-            user_group.group_id = group_id
-            user_group_list.append(user_group)
-        db.session.add_all(user_group_list)
+        manager.replace_user_groups(user.id, json.group_ids)
     raise Success("操作成功")
 
 
@@ -246,7 +232,7 @@ def get_all_group():
     security=[AuthorizationBearerSecurity],
     resp=DocResponse(NotFound("分组不存在"), r=AdminGroupPermissionSchema),
 )
-def get_group(gid):
+def get_group(gid: int) -> dict:
     """
     获取一个分组及其权限
     """
@@ -254,9 +240,9 @@ def get_group(gid):
     if group is None:
         raise NotFound("分组不存在")
     permissions = manager.permission_model.select_by_group_id(gid)
-    setattr(group, "permissions", permissions)
-    group._fields.append("permissions")
-    return group
+    resp = dict(group)
+    resp["permissions"] = [dict(p) for p in permissions]
+    return resp
 
 
 @admin_api.route("/group", methods=["POST"])

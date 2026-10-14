@@ -5,7 +5,6 @@ from flask import current_app
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from . import manager
 from .db import db
 from .enums import GroupLevelEnum
 from .exception import NotFound, ParameterError, UnAuthentication
@@ -17,6 +16,7 @@ from .interface import (
     UserIdentityInterface,
     UserInterface,
 )
+from .manager import manager
 
 
 class Group(GroupInterface):
@@ -108,7 +108,7 @@ class User(UserInterface):
 
             if user_identity:
                 # 更新现有的认证记录
-                user_identity.credential = generate_password_hash(raw)
+                user_identity.credential = generate_password_hash(raw, method="scrypt")
                 user_identity.update(synchronize_session=False)
 
             else:
@@ -117,7 +117,7 @@ class User(UserInterface):
                 user_identity.user_id = self.id
                 user_identity.identity_type = "USERNAME_PASSWORD"  # 默认类型，可根据需要调整
                 user_identity.identifier = self.username  # 使用用户的实际用户名
-                user_identity.credential = generate_password_hash(raw)
+                user_identity.credential = generate_password_hash(raw, method="scrypt")
                 db.session.add(user_identity)
                 db.session.commit()
         except Exception as e:

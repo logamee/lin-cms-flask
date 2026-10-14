@@ -5,17 +5,15 @@ user apis
 :license: MIT, see LICENSE for more details.
 """
 
+import json
+from typing import Any
+
 import jwt
 from flask import Blueprint, current_app, request
-from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
-    get_current_user,
-    get_jwt_identity,
-    verify_jwt_in_request,
-)
+from flask_jwt_extended import get_current_user, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended.exceptions import JWTExtendedException
 
-from app.api import AuthorizationBearerSecurity, api
+from app.api import AuthorizationBearerSecurity, api, limiter
 from app.api.cms.exception import RefreshFailed
 from app.api.cms.schema.user import (
     CaptchaSchema,
@@ -49,6 +47,7 @@ user_api = Blueprint("user", __name__)
 
 
 @user_api.route("/register", methods=["POST"])
+@limiter.limit("10 per hour")
 @permission_meta(name="注册", module="用户", mount=False)
 @Logger(template="管理员新建了一个用户")  # 记录日志
 @admin_required
@@ -75,22 +74,13 @@ def register(json: UserRegisterSchema):
         db.session.add(user)
         db.session.flush()
         user.password = json.password
-        group_ids = json.group_ids
-        # 如果没传分组数据，则将其设定为 guest 分组
-        if len(group_ids) == 0:
-            from app.lin import GroupLevelEnum
-
-            group_ids = [GroupLevelEnum.GUEST.value]
-        for group_id in group_ids:
-            user_group = manager.user_group_model()
-            user_group.user_id = user.id
-            user_group.group_id = group_id
-            db.session.add(user_group)
-
+        # 未传分组时默认落入 Guest 分组（按级别解析 ID，而非硬编码）
+        manager.replace_user_groups(user.id, json.group_ids)
     raise Success("用户创建成功")  # type: ignore
 
 
 @user_api.route("/login", methods=["POST"])
+@limiter.limit("20 per minute")
 @api.validate(resp=DocResponse(Failed("验证码校验失败"), r=LoginTokenSchema), tags=["用户"])
 def login(json: LoginSchema):
     """
@@ -100,7 +90,11 @@ def login(json: LoginSchema):
     if current_app.config.get("LOGIN_CAPTCHA"):
         tag = request.headers.get("tag", "")
         secret_key = current_app.config.get("SECRET_KEY", "")
-        if json.captcha != jwt.decode(tag, secret_key, algorithms=["HS256"]).get("code"):
+        try:
+            code = jwt.decode(tag, secret_key, algorithms=["HS256"]).get("code")
+        except jwt.PyJWTError:
+            raise Failed("验证码校验失败")  # type: ignore
+        if json.captcha != code:
             raise Failed("验证码校验失败")  # type: ignore
 
     user = manager.user_model.verify(json.username, json.password)
@@ -164,9 +158,8 @@ def change_password(json: ChangePasswordSchema):
     ok = user.change_password(json.old_password, json.new_password)
     if ok:
         db.session.commit()
-        raise Success("密码修改成功")
-    else:
-        return Failed("修改密码失败")
+        raise Success("密码修改成功")  # type: ignore
+    raise Failed("修改密码失败")  # type: ignore
 
 
 @user_api.route("/information")
@@ -186,6 +179,7 @@ def get_information():
 
 
 @user_api.route("/refresh")
+@limiter.limit("20 per minute")
 @permission_meta(name="刷新令牌", module="用户", mount=False)
 @api.validate(
     resp=DocResponse(RefreshFailed, NotFound("refresh_token未被识别"), r=LoginTokenSchema),
@@ -197,16 +191,65 @@ def refresh():
     """
     try:
         verify_jwt_in_request(refresh=True)
-    except Exception:
+    except (JWTExtendedException, jwt.PyJWTError):
         raise RefreshFailed
 
-    identity = get_jwt_identity()
-    if identity:
-        access_token = create_access_token(identity=identity)
-        refresh_token = create_refresh_token(identity=identity)
-        return LoginTokenSchema(access_token=access_token, refresh_token=refresh_token)
+    raw_identity = get_jwt_identity()
+    try:
+        identity: Any = json.loads(raw_identity) if isinstance(raw_identity, str) else raw_identity
+    except (TypeError, ValueError):
+        raise RefreshFailed
+    uid = identity.get("uid") if isinstance(identity, dict) else None
+    user = manager.find_user(id=uid) if uid is not None else None
+    if user is None or not user.is_active:
+        raise RefreshFailed
+    # 令牌版本校验：改密后旧 refresh 一并失效
+    if identity.get("ver", 0) != getattr(user, "token_version", 0):
+        raise RefreshFailed
+    access_token, refresh_token = get_tokens(user)
+    return LoginTokenSchema(access_token=access_token, refresh_token=refresh_token)
 
-    return NotFound("refresh_token未被识别")
+
+@user_api.route("/logout", methods=["POST"])
+@permission_meta(name="退出登录", module="用户", mount=False)
+@limiter.limit("20 per minute")
+@login_required
+@api.validate(
+    tags=["用户"],
+    security=[AuthorizationBearerSecurity],
+    resp=DocResponse(Success("退出成功")),
+)
+def logout():
+    """
+    退出登录：吊销当前 access 令牌；请求体可选携带 refresh_token 一并吊销
+    """
+    from datetime import datetime
+
+    from flask_jwt_extended import get_jwt
+
+    from app.api.cms.model.token_blocklist import TokenBlocklist
+
+    claims = get_jwt()
+    uid = claims.get("uid") or 0
+    TokenBlocklist.revoke(
+        jti=claims["jti"],
+        expires_at=datetime.fromtimestamp(claims["exp"]),
+        user_id=uid,
+    )
+    # 可选：请求体携带 refresh_token 时一并吊销（无效令牌直接忽略）
+    body = request.get_json(silent=True) or {}
+    raw_refresh = body.get("refresh_token") if isinstance(body, dict) else None
+    if raw_refresh:
+        try:
+            rclaims = jwt.decode(raw_refresh, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+            TokenBlocklist.revoke(
+                jti=rclaims["jti"],
+                expires_at=datetime.fromtimestamp(rclaims["exp"]),
+                user_id=uid,
+            )
+        except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+            pass
+    raise Success("退出成功")  # type: ignore
 
 
 @user_api.route("/permissions")
@@ -217,7 +260,7 @@ def refresh():
     security=[AuthorizationBearerSecurity],
     # resp=DocResponse(r=UserPermissionSchema), # 当前数据接口无法使用OpenAPI表示
 )
-def get_allowed_apis():
+def get_allowed_apis() -> dict:
     """
     获取用户拥有的权限
     """
@@ -227,14 +270,14 @@ def get_allowed_apis():
     _permissions = manager.permission_model.select_by_group_ids(group_ids)
     permission_list = [{"permission": permission.name, "module": permission.module} for permission in _permissions]
     res = split_group(permission_list, "module")
-    setattr(user, "permissions", res)
-    setattr(user, "admin", user.is_admin)
-    user._fields.extend(["admin", "permissions"])
-
-    return user
+    resp = dict(user)
+    resp["admin"] = user.is_admin
+    resp["permissions"] = res
+    return resp
 
 
 @user_api.route("/captcha", methods=["GET", "POST"])
+@limiter.limit("30 per minute")
 @api.validate(
     resp=DocResponse(r=CaptchaSchema),
     tags=["用户"],

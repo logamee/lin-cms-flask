@@ -31,11 +31,14 @@ class User(LinUser):
         users = result.all()
         return users
 
-    def reset_password(self, new_password):
+    def reset_password(self, new_password: str) -> None:
         self.password = new_password
+        # 吊销该用户全部存量令牌
+        self.token_version = (self.token_version or 0) + 1  # type: ignore[assignment,operator]
 
-    def change_password(self, old_password, new_password):
+    def change_password(self, old_password: str, new_password: str) -> bool:
         if self.check_password(old_password):
             self.password = new_password
+            self.token_version = (self.token_version or 0) + 1  # type: ignore[assignment,operator]
             return True
         return False

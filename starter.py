@@ -3,6 +3,8 @@
 :license: MIT, see LICENSE for more details.
 """
 
+import os
+
 from app import create_app
 from app.api.cms.model.group import Group
 from app.api.cms.model.group_permission import GroupPermission
@@ -24,12 +26,11 @@ app = create_app(
 )
 
 
-@app.route("/hello")
-def hello():
-    return Book.get(one=True)
+if os.environ.get("FLASK_ENV") != "production":
 
-
-if app.config.get("ENV") != "production":
+    @app.route("/hello")
+    def hello():
+        return Book.get(one=True)
 
     @app.route("/")
     def slogan():
@@ -86,11 +87,9 @@ if app.config.get("ENV") != "production":
 
 
 if __name__ == "__main__":
-    app.logger.warning(
-        """
+    app.logger.warning("""
         ----------------------------
         |  app.run() => flask run  |
         ----------------------------
-        """
-    )
+        """)
     app.run()

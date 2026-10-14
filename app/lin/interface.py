@@ -8,8 +8,9 @@ interface means you must implement the necessary methods and inherit properties.
 :copyright: © 2020 by the Lin team.
 :license: MIT, see LICENSE for more details.
 """
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, TypeVar, overload
 
 try:
     from typing import Self  # Python 3.11+
@@ -52,9 +53,19 @@ class BaseCrud(db.Model, MixinJSONSerializer):
 
     # 查
     @classmethod
+    @overload
     def get(
-        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any
-    ) -> Union[Optional[Self], List[Self]]:
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: Literal[True] = True, **kwargs: Any
+    ) -> Optional[Self]: ...  # noqa: E704
+
+    @classmethod
+    @overload
+    def get(
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: Literal[False] = ..., **kwargs: Any
+    ) -> List[Self]: ...  # noqa: E704
+
+    @classmethod
+    def get(cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any) -> Any:
         if one:
             return cls.query.filter().filter_by(**kwargs).first()
         return cls.query.filter().filter_by(**kwargs).offset(start).limit(count).all()
@@ -72,11 +83,11 @@ class BaseCrud(db.Model, MixinJSONSerializer):
         return one
 
     def update(self, commit: bool = False, **kwargs: Any) -> Self:
-        for key in kwargs.keys():
+        for key, value in kwargs.items():
             if hasattr(self, key):
-                setattr(self, key, kwargs[key])
+                setattr(self, key, value)
         db.session.add(self)
-        if kwargs.get("commit") is True:
+        if commit:
             db.session.commit()
         return self
 
@@ -116,9 +127,19 @@ class InfoCrud(db.Model, MixinJSONSerializer):
 
     # 查
     @classmethod
+    @overload
     def get(
-        cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any
-    ) -> Union[Optional[Self], List[Self]]:
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: Literal[True] = True, **kwargs: Any
+    ) -> Optional[Self]: ...  # noqa: E704
+
+    @classmethod
+    @overload
+    def get(
+        cls, start: Optional[int] = None, count: Optional[int] = None, one: Literal[False] = ..., **kwargs: Any
+    ) -> List[Self]: ...  # noqa: E704
+
+    @classmethod
+    def get(cls, start: Optional[int] = None, count: Optional[int] = None, one: bool = True, **kwargs: Any) -> Any:
         # 应用软删除，必须带有delete_time
         if kwargs.get("is_deleted") is None:
             kwargs["is_deleted"] = False
@@ -131,10 +152,6 @@ class InfoCrud(db.Model, MixinJSONSerializer):
     def create(cls, **kwargs: Any) -> Self:
         one = cls()
         for key in kwargs.keys():
-            # if key == 'from':
-            #     setattr(one, '_from', kwargs[key])
-            # if key == 'parts':
-            #     setattr(one, '_parts', kwargs[key])
             if hasattr(one, key):
                 setattr(one, key, kwargs[key])
         db.session.add(one)
@@ -142,14 +159,12 @@ class InfoCrud(db.Model, MixinJSONSerializer):
             db.session.commit()
         return one
 
-    def update(self, **kwargs: Any) -> Self:
-        for key in kwargs.keys():
-            # if key == 'from':
-            #     setattr(self, '_from', kwargs[key])
+    def update(self, commit: bool = False, **kwargs: Any) -> Self:
+        for key, value in kwargs.items():
             if hasattr(self, key):
-                setattr(self, key, kwargs[key])
+                setattr(self, key, value)
         db.session.add(self)
-        if kwargs.get("commit") is True:
+        if commit:
             db.session.commit()
         return self
 
@@ -212,6 +227,8 @@ class UserInterface(InfoCrud):
     nickname = Column(String(24), comment="用户昵称")
     _avatar = Column("avatar", String(500), comment="头像url")
     email = Column(String(100), comment="邮箱")
+    # 令牌版本：改密/重置密码后 +1，该用户全部存量令牌（含 refresh）随之失效
+    token_version = Column(Integer(), nullable=False, server_default=text("0"), comment="令牌版本号")
 
     @property
     def avatar(self) -> Optional[str]:

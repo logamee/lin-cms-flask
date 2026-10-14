@@ -48,8 +48,8 @@ def upload_one():
     image = request.files.get("image", None)
     if not image:
         raise ParameterError("没有找到图片")
-    if image and allowed_file(image.filename):
-        return upload_image_and_create_cos(image.filename, image.read())
+    if image and allowed_file(image.filename or ""):
+        return upload_image_and_create_cos(image.filename or "", image.read())
     return Failed("上传图片失败，请检查图片路径")
 
 
@@ -66,8 +66,8 @@ def upload_multiple():
         image = request.files.get(item, None)
         if not image:
             raise ParameterError("没接收到图片，请检查图片路径")
-        if image and allowed_file(image.filename):
-            images.append(upload_image_and_create_cos(image.filename, image.read()))
+        if image and allowed_file(image.filename or ""):
+            images.append(upload_image_and_create_cos(image.filename or "", image.read()))
     return images
 
 
@@ -81,7 +81,7 @@ def upload_image_and_create_cos(name: str, data: bytes) -> dict:
         return res
 
     file_key = COS.generate_key(name)
-    client.put_object(Bucket=bucket, Body=data, Key=file_key, StorageClass="STANDARD")
+    client.put_object(Bucket=bucket, Body=data, Key=file_key, StorageClass="STANDARD")  # type: ignore[attr-defined]
     res = {"file_name": name, "file_key": file_key}
     url = COS.get_url(client, bucket, file_key)
     if lin_config.get_config("cos.need_return_url"):

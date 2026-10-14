@@ -8,12 +8,14 @@
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type
 
 from flask import current_app
 from werkzeug.local import LocalProxy
 
 from .db import db
+from .enums import GroupLevelEnum
+from .exception import NotFound
 
 __all__ = ["Manager", "manager"]
 
@@ -52,6 +54,25 @@ class Manager(object):
 
     def find_group(self, **kwargs: Any) -> Optional[Any]:
         return self.group_model.query.filter_by(**kwargs).first()
+
+    def get_guest_group_id(self) -> int:
+        """按级别解析 Guest 分组 ID。分组 ID 与级别值没有必然关系，禁止混用。"""
+        group = self.group_model.get(level=GroupLevelEnum.GUEST.value)
+        if group is None:
+            raise NotFound("默认分组（Guest）不存在，请先初始化数据库")
+        return group.id
+
+    def replace_user_groups(self, user_id: int, group_ids: Optional[List[int]]) -> None:
+        """清空并重建用户-分组关联；未传分组时默认落入 Guest 分组。须在事务中调用。"""
+        ids = list(group_ids) if group_ids else [self.get_guest_group_id()]
+        self.user_group_model.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+        rows = []
+        for group_id in ids:
+            user_group = self.user_group_model()
+            user_group.user_id = user_id
+            user_group.group_id = group_id
+            rows.append(user_group)
+        db.session.add_all(rows)
 
     def get_ep_infos(self) -> Dict[str, List[Any]]:
         """返回权限管理中的所有视图函数的信息，包含它所属module"""
@@ -149,8 +170,8 @@ class Manager(object):
         return None
 
     def sync_permissions(self) -> None:
+        # 注意：schema 由 flask-migrate 管理（flask db upgrade），此处只做权限数据同步
         with db.auto_commit():
-            db.create_all()
             permissions = self.permission_model.get(one=False)
             # 新增的权限记录
             new_added_permissions: set[Any] = set()
@@ -219,10 +240,9 @@ def get_manager() -> Manager:
     _manager = current_app.extensions["manager"]
     if _manager:
         return _manager
-    else:
-        app = current_app._get_current_object()
-        with app.app_context():
-            return app.extensions["manager"]
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    with app.app_context():
+        return app.extensions["manager"]
 
 
 # a proxy for manager instance
@@ -230,4 +250,4 @@ def get_manager() -> Manager:
 
 # 获得manager实例
 # 注意，仅仅在flask的上下文栈中才可获得
-manager: Manager = LocalProxy(lambda: get_manager())
+manager: Any = LocalProxy(lambda: get_manager())

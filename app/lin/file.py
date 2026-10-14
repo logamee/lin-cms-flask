@@ -9,16 +9,16 @@ uploader 模块，使用策略模式实现的上传文件接口
 
 import hashlib
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 from flask import current_app
-from werkzeug.datastructures import FileStorage
+from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 from .exception import FileExtensionError, FileTooLarge, FileTooMany, ParameterError
 
 
-class Uploader(object):
-    def __init__(self, files: Union[List[FileStorage], FileStorage], config: Dict[str, Any] = {}):
+class Uploader:
+    def __init__(self, files: ImmutableMultiDict, config: Dict[str, Any] = {}):
         #: the list of allowed files
         #: 被允许的文件类型列表
         self._include: List[str] = []
@@ -43,7 +43,7 @@ class Uploader(object):
         self.__load_config(config)
         self.__verify()
 
-    def upload(self, **kwargs) -> Dict[str, Any]:
+    def upload(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         文件上传抽象方法，一定要被子类所实现
         """
@@ -93,7 +93,7 @@ class Uploader(object):
         :param custom_config: 用户自定义配置参数
         :return: None
         """
-        default_config = current_app.config.get("FILE")
+        default_config: Dict[str, Any] = current_app.config.get("FILE") or {}
         self._include = custom_config["INCLUDE"] if "INCLUDE" in custom_config else default_config["INCLUDE"]
         self._exclude = custom_config["EXCLUDE"] if "EXCLUDE" in custom_config else default_config["EXCLUDE"]
         self._single_limit = (
@@ -106,7 +106,7 @@ class Uploader(object):
         self._store_dir = custom_config["STORE_DIR"] if "STORE_DIR" in custom_config else default_config["STORE_DIR"]
 
     @staticmethod
-    def __parse_files(files: Union[List[FileStorage], FileStorage]) -> List[FileStorage]:
+    def __parse_files(files: ImmutableMultiDict) -> List[FileStorage]:
         ret: List[FileStorage] = []
         for key, value in files.items():
             ret += files.getlist(key)
@@ -151,12 +151,14 @@ class Uploader(object):
         """
         if (self._include and self._exclude) or self._include:
             for single in self._file_storage:
-                if "." not in single.filename or single.filename.lower().rsplit(".", 1)[1] not in self._include:
+                name = single.filename or ""
+                if "." not in name or name.lower().rsplit(".", 1)[1] not in self._include:
                     raise FileExtensionError()
             return True
         elif self._exclude and not self._include:
             for single in self._file_storage:
-                if "." not in single.filename or single.filename.lower().rsplit(".", 1)[1] in self._exclude:
+                name = single.filename or ""
+                if "." not in name or name.lower().rsplit(".", 1)[1] in self._exclude:
                     raise FileExtensionError()
             return True
         return False
@@ -172,7 +174,7 @@ class Uploader(object):
             total_size = 0
             for single in self._file_storage:
                 if self._get_size(single) > self._single_limit:
-                    raise FileTooLarge(single.filename + "大小不能超过" + str(self._single_limit) + "字节")
+                    raise FileTooLarge((single.filename or "") + "大小不能超过" + str(self._single_limit) + "字节")
                 total_size += self._get_size(single)
             if total_size > self._total_limit:
                 raise FileTooLarge()

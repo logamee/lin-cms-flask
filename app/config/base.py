@@ -14,8 +14,8 @@ class BaseConfig(object):
 
     # 先读 env 环境变量中的配置
 
-    # 指定加密KEY
-    SECRET_KEY = os.getenv("SECRET_KEY", "https://github.com/TaleLin/lin-cms-flask")
+    # 指定加密KEY（必须通过环境变量或 .{env}.env 提供，禁止内置缺省值）
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
     # 指定访问api服务的url, 用于文件上传
     # SITE_DOMAIN="https://lincms.example.com"
@@ -41,9 +41,20 @@ class BaseConfig(object):
 
     # 令牌配置
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+    # 刷新令牌必须显式设置有效期（框架默认 30 天过长且无法吊销）
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
+
+    # CORS 来源白名单；默认空=仅同源，开发环境在 DevelopmentConfig 中放开本地前端
+    CORS_ORIGINS: list = []
 
     # 登录验证码
     LOGIN_CAPTCHA = False
+
+    # 限流存储：开发默认内存；生产多 worker 部署必须配置 redis:// 等共享存储
+    RATELIMIT_STORAGE_URI = "memory://"
+
+    # 反向代理场景开启后，依据 X-Forwarded-For/Proto 还原真实客户端 IP（限流按真实 IP 计数）
+    PROXY_FIX = False
 
     # 默认文件上传配置
     FILE = {

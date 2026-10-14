@@ -42,8 +42,8 @@ class Poem(Base):
         return poems
 
     @classmethod
-    def get_authors(cls):
-        authors = (
+    def get_authors(cls) -> list:
+        authors: list = (
             db.session.query(cls.author)
             .filter_by(soft=False)
             .group_by(text("author"))

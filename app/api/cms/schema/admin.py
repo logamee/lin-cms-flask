@@ -25,7 +25,7 @@ class AdminUserSchema(EmailSchema):
 
 
 class QueryPageWithGroupIdSchema(QueryPageSchema):
-    group_id: Optional[int] = Field(None, description="用户ID")
+    group_id: Optional[int] = Field(None, description="分组ID（按分组过滤用户）")
 
 
 class AdminUserPageSchema(BasePageSchema):

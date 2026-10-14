@@ -4,7 +4,7 @@
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Optional, Type
 
 from flask import Blueprint, Flask
 from pydantic import ValidationError as PydanticValidationError
@@ -85,7 +85,7 @@ class Lin(object):
         if not user_model:
             from .model import User
 
-            self.user_model = User
+            user_model = User
         if not permission_model:
             from .model import Permission
 
@@ -132,10 +132,14 @@ class Lin(object):
         self.app.extensions["manager"] = self.manager
         db.init_app(app)
         jwt.init_app(app)
-        mount and self.mount(app)
-        sync_permissions and self.sync_permissions(app)
-        handle and self.handle_error(app)
-        syslogger and SysLogger(app)
+        if mount:
+            self.mount(app)
+        if sync_permissions:
+            self.sync_permissions(app)
+        if handle:
+            self.handle_error(app)
+        if syslogger:
+            SysLogger(app)
 
     def sync_permissions(self, app: Flask) -> None:
         # 挂载后才能获取代码中的权限
@@ -143,8 +147,12 @@ class Lin(object):
         try:
             with app.app_context():
                 self.manager.sync_permissions()
-        except DatabaseError:
-            pass
+        except DatabaseError as e:
+            app.logger.warning(
+                "启动时权限同步跳过（数据库尚未迁移时属正常，请先执行 flask db upgrade；"
+                "若已迁移请检查数据库连接）: %s",
+                e,
+            )
 
     def mount(self, app: Flask) -> None:
         # 加载默认插件路由
@@ -174,7 +182,7 @@ class Lin(object):
                 code = e.code
                 message = e.description
                 message_code = 20000
-                return APIException(message_code, message).set_code(code)
+                return APIException(message_code, message).set_code(code or 500)
             else:
                 if not app.config["DEBUG"]:
                     import traceback
@@ -187,4 +195,4 @@ class Lin(object):
     def enable_auto_jsonify(self, app: Flask) -> None:
         # app.json_encoder = self.jsonencoder or JSONEncoder
         app.json = self.jsonencoder(app) if self.jsonencoder else JSONEncoder(app)
-        app.make_response = auto_response(app.make_response)
+        app.make_response = auto_response(app.make_response)  # type: ignore[method-assign]

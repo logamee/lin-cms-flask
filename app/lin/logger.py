@@ -10,13 +10,14 @@ logger模块，用户行为日志记录器
 
 import re
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
 from flask import Response, request
 from flask_jwt_extended import get_current_user
 from sqlalchemy import Column, Integer, String, func
 
 from .db import db
+from .exception import UnAuthentication
 from .interface import InfoCrud
 from .manager import manager
 
@@ -72,15 +73,15 @@ class Log(InfoCrud):
 
     @classmethod
     def get_usernames(cls) -> List[str]:
-        result = (
+        rows: List[Any] = (
             db.session.query(cls.username)
-            .filter(cls.is_deleted == False)
+            .filter(cls.is_deleted == False)  # noqa: E712
             .group_by(cls.username)
             .having(func.count(cls.username) > 0)
+            .all()
         )
-        # [(‘张三',),('李四',),...] -> ['张三','李四',...]
-        usernames = [x[0] for x in result.all()]
-        return usernames
+        # [('张三',),('李四',),...] -> ['张三','李四',...]
+        return [x[0] for x in rows]
 
     @staticmethod
     def create_log(**kwargs: Any) -> "Log":
@@ -122,7 +123,7 @@ class Logger(object):
             self.response = response
             self.user = get_current_user()
             if not self.user:
-                raise Exception("Logger must be used in the login state")
+                raise UnAuthentication("Logger 必须在登录态下使用")  # type: ignore
             self.message = self._parse_template()
             self.write_log()
             return response
@@ -130,13 +131,15 @@ class Logger(object):
         return cast(F, wrap)
 
     def write_log(self) -> None:
-        info = manager.find_info_by_ep(request.endpoint)
+        info = manager.find_info_by_ep(request.endpoint) if request.endpoint else None
         permission = info.name if info is not None else ""
         status_code = getattr(self.response, "status_code", None)
         if status_code is None:
             status_code = getattr(self.response, "code", None)
         if status_code is None:
             status_code = 0
+        if self.user is None:
+            return
         Log.create_log(
             message=self.message,
             user_id=self.user.id,
@@ -150,13 +153,13 @@ class Logger(object):
 
     # 解析自定义模板
     def _parse_template(self) -> str:
-        message = self.template
+        message = self.template or ""
         total = re.findall(REG_XP, message)
         for it in total:
             assert "." in it, "%s中必须包含 . ,且为一个" % it
             i = it.rindex(".")
             obj = it[:i]
-            assert obj in OBJECTS, "%s只能为user,response,request中的一个" % obj
+            assert obj in OBJECTS, "%s只能为user,response,request中的一个" % it
             prop = it[i + 1 :]
             if obj == "user":
                 item = getattr(self.user, prop, "")

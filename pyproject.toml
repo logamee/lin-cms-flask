@@ -2,49 +2,54 @@
 name = "app"
 version = "0.6"
 description = "🎀A simple and practical CMS implememted by flask"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 authors = [
     {name = "sunlin92", email = "sun.melodies@gmail.com"}
 ]
 dependencies = [
-    "Flask==3.1.3",
-    "Flask-JWT-Extended==4.7.1",
-    "Flask-SQLAlchemy==3.1.1",
-    "WTForms==3.2.1",
-    "tablib==3.9.0",
-    "spectree==2.0.1",
-    "pillow>=11.1.0",
-    "flask-cors>=6.0.2",
-    "gunicorn>=25.3.0",
-    "gevent>=25.9.1",
+    "Flask>=3.1.3",
+    "Flask-JWT-Extended>=4.7.4",
+    "Flask-SQLAlchemy>=3.1.1",
+    "SQLAlchemy>=2.0.49",
+    "WTForms>=3.2.2",
+    "tablib>=3.10.0",
+    "spectree>=3.0.0,<4.0.0",
+    "pillow>=12.3.0",
+    "flask-cors>=6.0.5",
+    "gunicorn>=26.2.0",
+    "gevent>=26.9.0",
     "blinker>=1.9.0",
-    "python-dotenv>=1.0.1",
+    "python-dotenv>=1.2.4",
     "pydantic[email]>=2.12.5,<3.0.0",
+    "flask-limiter>=4.1.1",
+    "flask-migrate>=4.1.0",
 ]
 
 [project.optional-dependencies]
+mysql = [
+    "PyMySQL>=1.2.3",
+]
+postgres = [
+    "psycopg[binary]>=3.3.6",
+]
 dev = [
-    "black>=25.1.0",
-    "isort>=6.0.1",
+    "black>=26.10.1",
+    "isort>=9.0.2",
     "watchdog>=6.0.0",
-    "coverage>=7.6.12",
-    "pytest>=8.3.5",
-    "pre-commit>=4.1.0",
-    "pytest-order>=1.3.0",
-    "flake8>=7.1.2",
-    "mypy>=1.15.0",
+    "coverage>=7.16.2",
+    "pytest>=9.1.1",
+    "pre-commit>=4.7.0",
+    "flake8>=7.4.1",
+    "mypy>=2.4.0",
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
-[[tool.poetry.source]]
-name = "tsinghua"
-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
-priority = "primary"
 
 [tool.isort]
+profile = "black"
 multi_line_output = 3
 force_grid_wrap = 0
 line_length = 120
@@ -55,8 +60,28 @@ include_trailing_comma = true
 line_length = 120
 
 [tool.mypy]
-files = ["starter.py"]
+files = ["app", "starter.py", "tests"]
+explicit_package_bases = true
 ignore_missing_imports = true
+check_untyped_defs = true
 
-[tool.pytest]
+[[tool.mypy.overrides]]
+# SQLAlchemy 声明式基类/动态属性属于框架魔法，mypy 无法静态理解
+module = ["app.lin.db", "app.lin.interface"]
+disable_error_code = ["name-defined", "assignment", "misc", "valid-type", "arg-type", "attr-defined"]
+
+[[tool.mypy.overrides]]
+# 种子数据/CLI 中的模型属性赋值同为 SQLAlchemy 动态模式
+module = ["app.plugin.poem.app", "app.cli.db.fake"]
+disable_error_code = ["assignment"]
+
+[tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/config/*", "app/plugin/*"]
+
+[tool.coverage.report]
+show_missing = true

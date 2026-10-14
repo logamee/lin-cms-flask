@@ -5,6 +5,8 @@ exceptions of Lin
 :license: MIT, see LICENSE for more details.
 """
 
+from typing import Any
+
 from flask import json, request
 from werkzeug.exceptions import HTTPException
 
@@ -13,12 +15,13 @@ from .config import global_config
 
 class APIException(HTTPException):
     code = 500
-    message = "抱歉，服务器未知错误"
+    # message 可能为 str 或 dict（构造参数允许两种），因此放宽为 Any
+    message: Any = "抱歉，服务器未知错误"
     message_code = 9999
     headers = {"Content-Type": "application/json"}
     _config = True
 
-    def __init__(self, *args):
+    def __init__(self, *args: Any) -> None:
         # 1. 没有参数
         if len(args) == 0:
             self.message = (

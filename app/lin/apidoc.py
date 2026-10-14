@@ -1,15 +1,14 @@
 import hashlib
 from functools import wraps
 from json import dumps
-from typing import *
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, get_type_hints
 
 from pydantic import BaseModel as _BaseModel
 from pydantic import ConfigDict
 from spectree import SpecTree as _SpecTree
-from spectree._types import ModelType
+from spectree.metadata import FunctionDecorator, register_validated_function
+from spectree.model_adapter.protocol import ModelClass
 from spectree.response import DEFAULT_CODE_DESC, Response
-
-from .db import Record, RecordCollection
 
 
 class ValidationError(_BaseModel):
@@ -26,14 +25,15 @@ class ApiMessageSchema(BaseModel):
     message: Any
     request: str
 
+
 class SpecTree(_SpecTree):
     def validate(  # noqa: PLR0913  [too-many-arguments]
         self,
-        query: Optional[ModelType] = None,
-        json: Optional[ModelType] = None,
-        form: Optional[ModelType] = None,
-        headers: Optional[ModelType] = None,
-        cookies: Optional[ModelType] = None,
+        query: Optional[ModelClass] = None,
+        json: Optional[ModelClass] = None,
+        form: Optional[ModelClass] = None,
+        headers: Optional[ModelClass] = None,
+        cookies: Optional[ModelClass] = None,
         resp: Optional[Response] = None,
         tags: Sequence = (),
         security: Any = None,
@@ -75,16 +75,16 @@ class SpecTree(_SpecTree):
         if not validation_error_status:
             validation_error_status = self.validation_error_status
 
-        def lin_before(req, resp, req_validation_error, instance):
+        def lin_before(req, resp, req_validation_error, instance, *extra):
             if before:
-                before(req, resp, req_validation_error, instance)
+                before(req, resp, req_validation_error, instance, *extra)
 
-        def lin_after(req, resp, resp_validation_error, instance):
+        def lin_after(req, resp, resp_validation_error, instance, *extra):
             # global after handler here
             if after:
-                after(req, resp, resp_validation_error, instance)
-            elif self.after:
-                self.after(req, resp, resp_validation_error, instance)
+                after(req, resp, resp_validation_error, instance, *extra)
+            elif self.after is not None:
+                self.after(req, resp, resp_validation_error, instance, *extra)
 
         def decorate_validation(func):
             @wraps(func)
@@ -118,36 +118,39 @@ class SpecTree(_SpecTree):
                 if annotations:
                     has_annotations = True
 
+            metadata = FunctionDecorator()
+
             # register
             for name, model in zip(
                 ("query", "json", "form", "headers", "cookies"),
                 (query, json, form, headers, cookies),
             ):
                 if model is not None:
-                    model_key = self._add_model(model=model)
-                    setattr(validation, name, model_key)
+                    model_key = self._add_model(model=model, mode="validation")
+                    setattr(metadata, name, model_key)
 
             if resp:
+                # spectree >= 3.0: response 必须先绑定 model_adapter，
+                # code_models 才能由 _raw_code_models 构建出来
+                resp.bind_model_adapter(self.model_adapter)
                 # Make sure that the endpoint specific status code and data model for
                 # validation errors shows up in the response spec.
-                # resp.add_model(
-                #     validation_error_status, self.validation_error_model, replace=False
-                # )
                 if has_annotations:
                     resp.add_model(validation_error_status, ValidationError, replace=False)
                 for model in resp.models:
-                    self._add_model(model=model)
-                validation.resp = resp
+                    self._add_model(model=model, mode="serialization")
+                metadata.resp = resp
 
             if tags:
-                validation.tags = tags
+                metadata.tags = tags
 
-            validation.security = security
-            validation.deprecated = deprecated
-            validation.path_parameter_descriptions = path_parameter_descriptions
-            validation.operation_id = operation_id
-            # register decorator
-            validation._decorator = self
+            metadata.security = security
+            metadata.deprecated = deprecated
+            metadata.path_parameter_descriptions = path_parameter_descriptions
+            metadata.operation_id = operation_id
+            # spectree >= 3.0: 元数据保存在 SpecTree 实例上，而不是函数属性
+            self._function_metadata[validation] = metadata
+            register_validated_function(validation)
             return validation
 
         return decorate_validation
@@ -156,8 +159,6 @@ class SpecTree(_SpecTree):
 def _json_default(value: Any) -> Any:
     if isinstance(value, _BaseModel):
         return value.model_dump()
-    if isinstance(value, (RecordCollection, Record)):
-        return value.as_dict()
     if isinstance(value, (set, tuple)):
         return list(value)
     if hasattr(value, "keys") and hasattr(value, "__getitem__"):
@@ -183,28 +184,31 @@ class DocResponse(Response):
         r=None,
     ) -> None:
         # 初始化 self
-        self.codes = []  # 重写功能后此属性无用，只是防止报错
-        self.code_models: Dict[str, ModelType] = {}
+        self.model_adapter = None
+        self.codes: List[str] = []
+        # spectree >= 3.0: 模型先存入 _raw_code_models，
+        # 由 bind_model_adapter 在注册时构建 code_models
+        self._raw_code_models: Dict[str, Any] = {}
+        self.code_models: Dict[str, Any] = {}
         self.code_descriptions: Dict[str, Optional[str]] = {}
-        self.code_list_item_types: Dict[str, ModelType] = {}
 
-        # 将 args 转换后存入code_models
+        # 将 args 转换后存入_raw_code_models
         for arg in args:
             assert "HTTP_" + str(arg.code) in DEFAULT_CODE_DESC, "invalid HTTP status code"
             http_status = "HTTP_" + str(arg.code)
-            self.code_models[http_status] = ApiMessageSchema
+            self._raw_code_models[http_status] = ApiMessageSchema
             if isinstance(arg.message, str):
                 self.code_descriptions[http_status] = arg.message
-        # 将 r 转换后存入code_models
+        # 将 r 转换后存入_raw_code_models
         if r:
             http_status = "HTTP_200"
             if isinstance(r, type) and issubclass(r, _BaseModel):
-                self.code_models[http_status] = r
+                self._raw_code_models[http_status] = r
             elif isinstance(r, dict):
                 r = type(f"Dict_{_fingerprint(r)}Schema", (BaseModel,), r)
-                self.code_models[http_status] = r
-            elif isinstance(r, (RecordCollection, Record)) or (hasattr(r, "keys") and hasattr(r, "__getitem__")):
+                self._raw_code_models[http_status] = r
+            elif hasattr(r, "keys") and hasattr(r, "__getitem__"):
                 payload = _json_default(r)
                 r = type(f"Json_{_fingerprint(payload)}Schema", (BaseModel,), payload)
-                self.code_models[http_status] = r
+                self._raw_code_models[http_status] = r
         self.r = r

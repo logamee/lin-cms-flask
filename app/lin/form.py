@@ -8,7 +8,7 @@ forms check the incoming params and data
 :license: MIT, see LICENSE for more details.
 """
 
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 from flask import request
 from wtforms import Field
@@ -56,7 +56,7 @@ class LinIntegerField(IntegerField):
     """
 
     def __init__(self, label: Optional[str] = None, validators: Optional[List[Any]] = None, **kwargs: Any) -> None:
-        if validators is not None and type(validators) == list:
+        if validators is not None and isinstance(validators, list):
             validators.insert(0, integer_check)
         else:
             validators = [integer_check]

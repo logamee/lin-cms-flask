@@ -32,7 +32,7 @@ def up_token():
         # 生成上传 Token，可以指定过期时间等
         # 上传策略示例
         # https://developer.qiniu.com/kodo/manual/1206/put-policy
-        policy = {
+        policy: dict = {
             # 'callbackUrl':'https://requestb.in/1c7q2d31',
             # 'callbackBody':'filename=$(fname)&filesize=$(fsize)'
             # 'persistentOps':'imageView2/1/w/200/h/200'

@@ -58,7 +58,7 @@ class PluginInit:
         for name in self.path_info:
             print("正在初始化插件" + name + "...")
             filename = "requirements.txt"
-            file_path = self.app.config.root_path + "/plugin/" + name + "/" + filename
+            file_path = str(self.app.config.root_path) + "/plugin/" + name + "/" + filename
             success_msg = "安装" + name + "插件的依赖成功"
             fail_msg = name + "插件的依赖安装失败，请[手动安装依赖]: https://doc.cms.talelin.com/"
             if os.path.exists(file_path):
@@ -126,10 +126,10 @@ class PluginInit:
 
         sub_str = "PLUGIN_PATH = " + self.__format_setting(final_setting)
 
-        setting_path = self.app.config.root_path + "/config/base.py"
+        setting_path = str(self.app.config.root_path) + "/config/base.py"
         with open(setting_path, "r", encoding="UTF-8") as f:
             content = f.read()
-            pattern = "PLUGIN_PATH = \{([\s\S]*)\}+.*?"  # type: ignore
+            pattern = r"PLUGIN_PATH = \{([\s\S]*)\}+.*?"
             if len(re.findall(pattern, content)) == 0:
                 content += """
     PLUGIN_PATH = {}
@@ -142,7 +142,7 @@ class PluginInit:
     def __get_all_plugins(self):
         # 返回所有插件的目录名称
         ret = []
-        path = self.app.config.root_path + "/plugin"
+        path = str(self.app.config.root_path) + "/plugin"
         for file in os.listdir(path=path):
             file_path = os.path.join(path, file)
             if os.path.isdir(file_path):

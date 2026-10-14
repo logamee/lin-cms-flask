@@ -1,8 +1,11 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from pydantic import EmailStr, Field, TypeAdapter, ValidationInfo, field_validator
 
 from app.lin import BaseModel, ParameterError
+
+# 统一密码策略：6-22 位（保持老用户习惯，无复杂度要求）
+PasswordStr = Annotated[str, Field(min_length=6, max_length=22)]
 
 EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
@@ -17,8 +20,8 @@ class EmailSchema(BaseModel):
 
 
 class ResetPasswordSchema(BaseModel):
-    new_password: str = Field(description="新密码", min_length=6, max_length=22)
-    confirm_password: str = Field(description="确认密码", min_length=6, max_length=22)
+    new_password: PasswordStr = Field(description="新密码")
+    confirm_password: PasswordStr = Field(description="确认密码")
 
     @field_validator("confirm_password")
     @classmethod

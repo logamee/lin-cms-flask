@@ -9,7 +9,7 @@ This module implements a config class
 """
 
 from collections import defaultdict
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 
 class Config(defaultdict[str, Any]):

@@ -146,5 +146,6 @@ lincmsdev.db
 lincmsprod.db
 lincms.db
 
-# .env 中记录了私密配置
-# *.env
+# .{env}.env 中记录了私密配置（密钥/数据库地址），禁止入库；模板见 .env.example
+.*.env
+!.env.example

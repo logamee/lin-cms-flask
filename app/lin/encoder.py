@@ -3,13 +3,10 @@ from decimal import Decimal
 from enum import Enum
 from typing import Iterable
 
-from flask import json, jsonify
+from flask import jsonify
 from flask.json.provider import DefaultJSONProvider
 from flask.wrappers import Response
 from pydantic import BaseModel as PydanticBaseModel
-
-from .db import Record, RecordCollection
-from .exception import APIException
 
 
 class JSONEncoder(DefaultJSONProvider):
@@ -34,8 +31,6 @@ class JSONEncoder(DefaultJSONProvider):
             return o.strftime("%Y-%m-%d")
         if isinstance(o, Enum):
             return o.value
-        if isinstance(o, (RecordCollection, Record)):
-            return o.as_dict()
         if isinstance(o, Decimal):
             return float(o)
         if isinstance(o, Iterable):
@@ -55,12 +50,14 @@ def auto_response(func):
             if isinstance(o[0], Response):
                 return func(o)
             if not isinstance(o[0], str):
+                # jsonify 而非裸 json.dumps:保证 Content-Type 为 application/json
+                # (裸 dumps 会以 text/html 返回 JSON 体)
                 oc = list(o)
-                oc[0] = json.dumps(o[0])
+                oc[0] = jsonify(oc[0])
                 o = tuple(oc)
             return func(o)
         if not isinstance(o, str) and (
-            isinstance(o, (RecordCollection, Record, PydanticBaseModel, Iterable))
+            isinstance(o, (PydanticBaseModel, Iterable))
             or (hasattr(o, "keys") and hasattr(o, "__getitem__"))
             or isinstance(o, (int, float, list, set, complex, Decimal, Enum))
         ):

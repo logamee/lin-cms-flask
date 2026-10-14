@@ -37,4 +37,4 @@ from .logger import Log, Logger
 from .manager import manager
 from .model import Group, GroupPermission, Permission, User, UserGroup, UserIdentity
 from .redprint import Redprint
-from .utils import permission_meta
+from .utils import get_random_str, permission_meta

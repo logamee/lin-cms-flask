@@ -5,7 +5,7 @@ from pydantic import Field, ValidationInfo, field_validator
 
 from app.lin import BaseModel, ParameterError
 
-from . import EmailSchema, GroupIdListSchema, ResetPasswordSchema
+from . import EmailSchema, GroupIdListSchema, PasswordStr, ResetPasswordSchema
 
 
 class LoginSchema(BaseModel):
@@ -53,8 +53,8 @@ class ChangePasswordSchema(ResetPasswordSchema):
 
 class UserRegisterSchema(GroupIdListSchema, EmailSchema):
     username: str = Field(description="用户名", min_length=2, max_length=10)
-    password: str = Field(description="密码", min_length=6, max_length=22)
-    confirm_password: str = Field(description="确认密码", min_length=6, max_length=22)
+    password: PasswordStr = Field(description="密码")
+    confirm_password: PasswordStr = Field(description="确认密码")
 
     @field_validator("confirm_password")
     @classmethod

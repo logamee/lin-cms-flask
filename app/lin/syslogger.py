@@ -19,6 +19,30 @@ from flask import Flask, g, json, request
 
 __all__ = ["SysLogger"]
 
+# 请求日志中必须脱敏的字段名（小写比较）
+SENSITIVE_FIELDS = frozenset(
+    {
+        "password",
+        "old_password",
+        "new_password",
+        "confirm_password",
+        "access_token",
+        "refresh_token",
+        "token",
+        "secret",
+        "secret_key",
+    }
+)
+
+
+def _redact(data: Any) -> Any:
+    """递归遮蔽敏感字段值，避免明文密码/令牌落入日志文件。"""
+    if isinstance(data, dict):
+        return {k: ("***" if str(k).lower() in SENSITIVE_FIELDS else _redact(v)) for k, v in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [_redact(item) for item in data]
+    return data
+
 
 class SysLogger:
     """
@@ -37,7 +61,7 @@ class SysLogger:
         self._fmt = fmt
         self._handler = handler
         self._logger: Optional[logging.Logger] = None
-        self._log_config = self._app.config.get("LOG")
+        self._log_config: dict = self._app.config.get("LOG") or {}
         self.init_logger()
         self.set_logger()
         self.display_request()
@@ -62,7 +86,7 @@ class SysLogger:
 
         @self._app.after_request
         def log_response(resp: Any) -> Any:
-            log_config = self._app.config.get("LOG")
+            log_config: dict = self._app.config.get("LOG") or {}
             if not log_config["REQUEST_LOG"]:
                 return resp
             message = "[%s] -> [%s] from:%s costs:%.3f ms" % (
@@ -74,14 +98,14 @@ class SysLogger:
             if log_config["LEVEL"] == "INFO":
                 self._app.logger.info(message)
             elif log_config["LEVEL"] == "DEBUG":
-                req_body = "{}"
+                req_body: Any = {}
                 try:
-                    req_body = request.get_json() if request.get_json() else {}
-                except Exception:
+                    req_body = request.get_json(silent=True) or {}
+                except Exception:  # pragma: no cover - get_json(silent=True) 已抑制解析异常
                     pass
                 message += " data:{\n\tparam: %s, \n\tbody: %s\n} " % (
-                    json.dumps(request.args, ensure_ascii=False),
-                    req_body,
+                    json.dumps(_redact(request.args), ensure_ascii=False),
+                    json.dumps(_redact(req_body), ensure_ascii=False),
                 )
                 self._app.logger.debug(message)
             return resp
@@ -103,14 +127,16 @@ class SysLogger:
                 if not self._fmt
                 else self._fmt
             )
-            logging.basicConfig(level=logging.DEBUG)
+            level_name = str(self._log_config.get("LEVEL", "DEBUG")).upper()
+            level = getattr(logging, level_name, logging.DEBUG)
+            logging.basicConfig(level=level)
             self._handler = LinRotatingFileHandler(
                 log_dir=self._log_config["DIR"],
                 max_bytes=self._log_config["SIZE_LIMIT"],
                 encoding="UTF-8",
             )
             self._handler.setFormatter(fmt)
-            self._handler.setLevel(level=logging.DEBUG)
+            self._handler.setLevel(level=level)
             self._app.logger.addHandler(self._handler)
         else:
             return
