@@ -1,7 +1,7 @@
 [project]
 name = "app"
 version = "0.7.0"
-description = "🎀A simple and practical CMS implememted by flask"
+description = "🎀A simple and practical CMS implemented by flask"
 requires-python = ">=3.11,<3.15"
 authors = [
     {name = "sunlin92", email = "sun.melodies@gmail.com"}
