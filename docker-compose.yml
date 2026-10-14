@@ -8,8 +8,29 @@ services:
       hostname: avatar
       environment:
             - TZ=Asia/Shanghai
+            # 生产模式强制要求 SECRET_KEY 与数据库地址（见 app/config/base.py）。
+            # SECRET_KEY 从宿主机环境变量或同目录 .env 读取；生成方式：
+            #   python -c 'import secrets; print(secrets.token_hex(32))'
+            - SECRET_KEY=${SECRET_KEY:?请在 .env 或环境变量中提供 SECRET_KEY}
+            # 默认使用容器内 SQLite（数据落在具名卷 instance-data，重建容器不丢）。
+            # 如需 MySQL/PostgreSQL，改为此连接串并去掉下方 instance-data 卷
+            - SQLALCHEMY_DATABASE_URI=sqlite:////app/instance/lincms.db
+            # 多 worker 部署建议启用 redis 共享限流（可选）：
+            # - RATELIMIT_STORAGE_URI=redis://host.docker.internal:6379/0
+      volumes:
+            - instance-data:/app/instance
       ports:
           - "5000:5000"
       working_dir: /app
       tty: true
+      # 容器内无 curl/wget，用标准库探活 /health
+      healthcheck:
+          test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"]
+          interval: 30s
+          timeout: 5s
+          retries: 3
+          start_period: 15s
       command: ["sh", "docker-deploy.sh"]
+
+volumes:
+    instance-data:

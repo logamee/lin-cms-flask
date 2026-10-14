@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com
 # 生产环境标识由 docker-deploy.sh 在启动时写入 .flaskenv
 ENV FLASK_ENV=production
 
-# 非 root 运行
-RUN useradd -m -u 1000 lincms && mkdir -p /app/logs /app/assets && chown -R lincms:lincms /app
+# 非 root 运行；/app/instance 供 compose 挂载卷存放 SQLite 数据
+RUN useradd -m -u 1000 lincms && mkdir -p /app/logs /app/assets /app/instance && chown -R lincms:lincms /app
 USER lincms
 
 EXPOSE 5000
