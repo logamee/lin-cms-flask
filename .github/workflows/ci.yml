@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+          uv pip install black isort flake8 mypy pytest coverage
+
+      - name: Lint (flake8)
+        run: uv run flake8 app starter.py tests
+
+      - name: Format check (black + isort)
+        run: |
+          uv run black --check app starter.py tests
+          uv run isort --check-only app starter.py tests
+
+      - name: Type check (mypy)
+        run: uv run mypy
+
+      - name: Migration check (fresh upgrade + model drift)
+        env:
+          FLASK_APP: starter:app
+          FLASK_ENV: development
+          SECRET_KEY: ci-only-secret-key-for-migration-check
+          SQLALCHEMY_DATABASE_URI: sqlite:////tmp/ci-mig.db
+        run: |
+          uv run flask db upgrade
+          uv run flask db check
+
+      - name: Test (pytest)
+        run: |
+          uv run coverage run -m pytest -q
+          uv run coverage report

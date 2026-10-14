@@ -1,1 +1,27 @@
+# 版本控制与本地状态
+.git
+.gitignore
 .venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.coverage
+.mypy_cache
+
+# 秘密配置（由部署方挂载或注入，绝不打进镜像）
+.*.env
+.flaskenv
+
+# 运行时产物
+logs
+assets
+*.db
+instance
+
+# 开发文件（docker-deploy.sh 是容器入口，必须保留在镜像内）
+tests
+.github
+.dockerignore
+Dockerfile
+docker-compose.yml
+.pre-commit-config.yaml

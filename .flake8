@@ -1,10 +1,10 @@
 [flake8]
 max-line-length = 120
 select = B,C,E,F,W,B9,T4
-ignore = E203, E266, E501, W503, E712, E711
+# E203/W503/E704 与 black 格式化风格冲突；E711/E712 为 SQLAlchemy 惯用比较
+ignore = E203, E266, E501, W503, E712, E711, E704
 per-file-ignores =
     __init__.py: F401
-    app/core/exception.py: F811
     app/cli/plugin/init.py: W605
 exclude =
     .venv,
