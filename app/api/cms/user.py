@@ -47,8 +47,8 @@ user_api = Blueprint("user", __name__)
 
 
 @user_api.route("/register", methods=["POST"])
-@limiter.limit("10 per hour")
 @permission_meta(name="注册", module="用户", mount=False)
+@limiter.limit("10 per hour")
 @Logger(template="管理员新建了一个用户")  # 记录日志
 @admin_required
 @api.validate(
@@ -179,8 +179,8 @@ def get_information():
 
 
 @user_api.route("/refresh")
-@limiter.limit("20 per minute")
 @permission_meta(name="刷新令牌", module="用户", mount=False)
+@limiter.limit("20 per minute")
 @api.validate(
     resp=DocResponse(RefreshFailed, NotFound("refresh_token未被识别"), r=LoginTokenSchema),
     tags=["用户"],
