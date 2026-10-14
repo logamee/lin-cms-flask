@@ -12,6 +12,7 @@
 - CI 流水线（flake8 / black / isort / mypy / pytest / 全新库迁移 + 模型漂移检查），覆盖率门槛 70%
 - Release 流水线：推送 `v*` 标签自动构建镜像推 ghcr.io 并创建 GitHub Release
 - `GET /health` 存活探针（无认证，供容器编排与反向代理使用）
+- 图形验证码重绘：160×48 抗锯齿渲染、随机色系配色、逐字符旋转缩放，替代旧版位图字体小图拉伸；导出修正为真 PNG（旧版 webp 字节标着 png 的 data URI）
 - 测试套件：安全加固、会话吊销（token_version）、框架核心、OpenAPI 契约、插件加载链路等（69+ 用例）
 - `app/config/test.py` 测试环境配置（内存库，关闭限流）
 - `.env.example` 环境变量模板；`.development.env` / `.production.env` 移出版本库
@@ -23,7 +24,7 @@
 - **[破坏性]** `SECRET_KEY` 必须显式提供：未设置或仍为模板占位符时启动失败（原版内置公开缺省值）
 - **[破坏性]** `flask db init` 语义定制为"迁移到最新 + 空库自动播种"（Root/Guest 分组、root 用户、权限）；alembic 原生 init 被安全遮蔽，`migrations/` 已随仓库提供
 - 刷新令牌有效期收紧为 7 天；改密/禁用用户令全量旧令牌失效
-- 认证类接口默认限流（flask-limiter），生产环境支持 redis 共享存储
+- 认证类接口默认限流（flask-limiter），生产环境支持 redis 共享存储；登录/刷新/登出/验证码 60 次/分钟，注册 30 次/小时
 - CORS 默认收紧为仅同源；开发环境放行本地前端 dev server
 - 生产环境关闭 Swagger UI 与 OpenAPI 规范导出
 - Docker 镜像以非 root 用户运行；compose 提供 SECRET_KEY/数据库注入、SQLite 具名卷与容器健康检查
