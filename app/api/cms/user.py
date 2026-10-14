@@ -48,7 +48,7 @@ user_api = Blueprint("user", __name__)
 
 @user_api.route("/register", methods=["POST"])
 @permission_meta(name="注册", module="用户", mount=False)
-@limiter.limit("10 per hour")
+@limiter.limit("30 per hour")
 @Logger(template="管理员新建了一个用户")  # 记录日志
 @admin_required
 @api.validate(
@@ -80,7 +80,7 @@ def register(json: UserRegisterSchema):
 
 
 @user_api.route("/login", methods=["POST"])
-@limiter.limit("20 per minute")
+@limiter.limit("60 per minute")
 @api.validate(resp=DocResponse(Failed("验证码校验失败"), r=LoginTokenSchema), tags=["用户"])
 def login(json: LoginSchema):
     """
@@ -180,7 +180,7 @@ def get_information():
 
 @user_api.route("/refresh")
 @permission_meta(name="刷新令牌", module="用户", mount=False)
-@limiter.limit("20 per minute")
+@limiter.limit("60 per minute")
 @api.validate(
     resp=DocResponse(RefreshFailed, NotFound("refresh_token未被识别"), r=LoginTokenSchema),
     tags=["用户"],
@@ -212,7 +212,7 @@ def refresh():
 
 @user_api.route("/logout", methods=["POST"])
 @permission_meta(name="退出登录", module="用户", mount=False)
-@limiter.limit("20 per minute")
+@limiter.limit("60 per minute")
 @login_required
 @api.validate(
     tags=["用户"],
@@ -277,7 +277,7 @@ def get_allowed_apis() -> dict:
 
 
 @user_api.route("/captcha", methods=["GET", "POST"])
-@limiter.limit("30 per minute")
+@limiter.limit("60 per minute")
 @api.validate(
     resp=DocResponse(r=CaptchaSchema),
     tags=["用户"],

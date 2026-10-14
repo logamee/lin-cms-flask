@@ -153,6 +153,21 @@ uv run coverage run -m pytest && uv run coverage report
 uv run pre-commit install    # 提交钩子：isort / black / flake8 / mypy
 ```
 
+### 新增接口的装饰器顺序（重要）
+
+`@permission_meta` 依赖函数身份匹配元信息，**必须紧贴路由装饰器、叠在一切会包装函数的装饰器（如 `@limiter.limit`）之上**：
+
+```python
+@cms_api.route("/xxx", methods=["POST"])
+@permission_meta(name="某操作", module="某模块", mount=False)   # ← 紧贴 route
+@limiter.limit("60 per minute")                               # ← 包装型装饰器放下面
+@api.validate(...)
+def your_view(json: SomeSchema):
+    ...
+```
+
+顺序叠反不会报错，但该权限声明不会同步进权限表（存量行还会被当作过期数据清理），由 `tests/test_permission_sync.py` 在 CI 兜底。
+
 ### 生产部署
 
 `requirements.txt` 由 uv.lock 导出，**请勿手工编辑**；升级依赖后重新生成：
@@ -196,7 +211,7 @@ curl http://127.0.0.1:5000/health      # 存活探针（无认证）
 #### 安全基线（内置，无需配置）
 
 - 密码策略：6-22 位（保持老用户习惯，无复杂度强制）
-- 认证接口限流：登录/刷新 20 次/分钟，验证码 30 次/分钟，注册 10 次/小时
+- 认证接口限流：登录/刷新/登出/验证码 60 次/分钟，注册 30 次/小时
 - refresh token 有效期 7 天；`POST /cms/user/logout` 可吊销令牌，**修改/重置密码会吊销该用户全部存量令牌**
 - 请求日志自动脱敏（password/token 等字段）
 
@@ -217,7 +232,7 @@ curl http://127.0.0.1:5000/health      # 存活探针（无认证）
 | 变化 | 影响 |
 |---|---|
 | 改密/管理员重置密码 → 该用户全部已登录设备立即下线 | 更安全；前端可调 `POST /cms/user/logout` 主动登出 |
-| 认证接口限流（数值见上方安全基线） | 手动使用无感；自动化脚本/高频轮询会收到 429 |
+| 认证接口限流（登录/刷新/登出/验证码 60 次/分钟，注册 30 次/小时） | 手动使用无感；自动化脚本/高频轮询会收到 429 |
 | 日志查询的用户名/时间过滤真实生效 | 旧版忽略这些参数恒返回全量；现在结果可能变少（修复） |
 | `/apidoc/*` 与 `/`、`/hello` 仅非生产环境可用 | 生产看文档请到预发/开发环境 |
 | 启动不再自动建表；改模型需 `flask db migrate && flask db upgrade` | 开发多一步；CI 的 `flask db check` 会拦截漏迁移 |
