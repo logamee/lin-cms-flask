@@ -32,6 +32,10 @@ mysql = [
 postgres = [
     "psycopg[binary]>=3.3.6",
 ]
+
+# 开发工具链走 PEP 735 dependency-groups（uv sync 默认安装，uv export 默认不含），
+# 与生产依赖分离：requirements.txt 仅锁运行时依赖
+[dependency-groups]
 dev = [
     "black>=26.10.1",
     "isort>=9.0.2",
@@ -85,3 +89,5 @@ omit = ["app/config/*", "app/plugin/*"]
 
 [tool.coverage.report]
 show_missing = true
+# 覆盖率门槛：当前 73%，取整设 70% 防回退，后续逐步上调
+fail_under = 70

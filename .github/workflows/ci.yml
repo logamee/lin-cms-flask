@@ -4,6 +4,8 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  # 供 release.yml 复用同一套质量门禁
+  workflow_call:
 
 jobs:
   quality:
@@ -16,11 +18,9 @@ jobs:
         with:
           python-version: "3.14"
 
+      # uv sync 按 uv.lock 精确还原（含 dev 工具链），比逐个 pip install 更可复现
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -r requirements.txt
-          uv pip install black isort flake8 mypy pytest coverage
+        run: uv sync --frozen
 
       - name: Lint (flake8)
         run: uv run flake8 app starter.py tests
