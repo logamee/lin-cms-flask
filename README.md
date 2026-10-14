@@ -153,6 +153,8 @@ uv run coverage run -m pytest && uv run coverage report
 uv run pre-commit install    # 提交钩子：isort / black / flake8 / mypy
 ```
 
+CI 在每次 push/PR 上执行同样的检查，外加全新库迁移与模型漂移校验；总覆盖率低于 70% 会让 CI 失败。
+
 ### 新增接口的装饰器顺序（重要）
 
 `@permission_meta` 依赖函数身份匹配元信息，**必须紧贴路由装饰器、叠在一切会包装函数的装饰器（如 `@limiter.limit`）之上**：
