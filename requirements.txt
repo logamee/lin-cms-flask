@@ -68,7 +68,7 @@ ordered-set==4.1.0
     # via flask-limiter
 packaging==26.3
     # via limits
-pillow==12.3.0
+pillow==13.0.0
     # via app
 pycparser==3.11 ; implementation_name != 'PyPy' and platform_python_implementation == 'CPython' and sys_platform == 'win32'
     # via cffi
